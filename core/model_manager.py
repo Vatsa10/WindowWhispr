@@ -14,6 +14,7 @@ from typing import Dict
 from core import paths
 from core.model_registry import (
     DEFAULT_MODEL_DISPLAY,
+    is_cloud_model,
     resolve_backend,
     resolve_llm_model_id,
     resolve_model_id,
@@ -162,10 +163,15 @@ def ensure_llm_model(display_name: str) -> str:
 
 
 def ensure_required_models(display_name: str | None = None) -> Dict[str, str]:
-    """Ensure all runtime models exist locally."""
+    """Ensure all runtime models exist locally.
+
+    A cloud ASR model has nothing to download, so only the VAD is fetched and
+    ``asr_model_dir`` comes back empty.
+    """
     selected = display_name or DEFAULT_MODEL_DISPLAY
+    asr_dir = "" if is_cloud_model(selected) else ensure_asr_model(selected)
     return {
-        "asr_model_dir": ensure_asr_model(selected),
+        "asr_model_dir": asr_dir,
         "vad_model_path": ensure_vad_model(),
     }
 

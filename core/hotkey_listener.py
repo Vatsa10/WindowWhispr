@@ -17,6 +17,7 @@ from core.active_window import active_app_name
 from core.cleanup import CleanupContext, CleanupLevel, VocabEntry
 from core.cleanup.orchestrator import DEFAULT_TIMEOUT_MS, run_cleanup
 from core.cleanup.provider_local import LocalCleanupProvider
+from core import diagnostics
 from core.diagnostics import Failure, diagnose
 from core.dictionary import DictionaryStore
 from core.state import (
@@ -248,6 +249,7 @@ class HotkeyListener:
                         self._key_queue.put(text)  # live-inject into the focused app
                     session_parts.append(text)
             # Flush the final in-progress utterance (no trailing silence yet).
+            # For a cloud model this is where the single request happens.
             try:
                 text, _duration = self._pipeline.flush()
                 if text:
@@ -256,6 +258,7 @@ class HotkeyListener:
                     session_parts.append(text)
             except Exception as exc:  # pragma: no cover - runtime guard
                 print(f"[WinWhispr][hotkey] Dictation flush error: {exc}")
+                self._report_transcription_error(exc)
         finally:
             self._pipeline.stop_capture()
             duration = time.time() - session_start
@@ -293,7 +296,7 @@ class HotkeyListener:
         if not discarded:
             self._finalize_session(final_text, raw_text, duration)
             if not final_text and not pending_key:
-                self._report(Failure.EMPTY_TRANSCRIPT)
+                self._report_nothing_heard()
         self._post(Committed(session) if (final_text or pending_key) else Failed(session))
 
     def _commit_text(self, raw_text: str) -> str:
@@ -333,6 +336,35 @@ class HotkeyListener:
         except Exception as exc:  # pragma: no cover - last-resort guard
             print(f"[WinWhispr][cleanup] failed, pasting raw: {exc}")
             return raw_text
+
+    def _report_nothing_heard(self) -> None:
+        """Say *why* nothing came out: a dead mic and a missed word differ."""
+        try:
+            stats = self._pipeline.session_audio_stats()
+        except Exception:  # pragma: no cover - pipeline guard
+            stats = {}
+        print(
+            "[WinWhispr][asr] nothing recognized "
+            f"(audio {stats.get('seconds', '?')}s, peak {stats.get('peak', '?')})"
+        )
+        if stats.get("samples", 0) == 0 or stats.get("silent"):
+            self._report(Failure.NO_AUDIO_CAPTURED)
+        else:
+            self._report(Failure.EMPTY_TRANSCRIPT)
+
+    def _report_transcription_error(self, exc: Exception) -> None:
+        """Turn a transcription failure into copy the user can act on."""
+        kind = getattr(exc, "kind", None)
+        if kind:
+            diag = diagnostics.for_cloud_error(kind)
+            print(f"[WinWhispr][diag] {diag.headline}: {diag.detail}")
+            if self._on_diagnostic is not None:
+                try:
+                    self._on_diagnostic(diag.headline, diag.detail)
+                except Exception:  # pragma: no cover - callback guard
+                    pass
+            return
+        self._report(Failure.ASR_UNAVAILABLE)
 
     def _watch_for_correction(self, pasted: str) -> None:
         """Learn a spelling if the user fixes one word of what we just pasted."""

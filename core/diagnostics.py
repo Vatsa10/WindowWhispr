@@ -27,6 +27,10 @@ class Failure(str, Enum):
     NO_AUDIO_CAPTURED = "no_audio_captured"
     EMPTY_TRANSCRIPT = "empty_transcript"
     ASR_UNAVAILABLE = "asr_unavailable"
+    CLOUD_NO_KEY = "cloud_no_key"
+    CLOUD_AUTH_REJECTED = "cloud_auth_rejected"
+    CLOUD_RATE_LIMITED = "cloud_rate_limited"
+    CLOUD_UNREACHABLE = "cloud_unreachable"
 
 
 @dataclass(frozen=True)
@@ -73,7 +77,44 @@ _COPY: dict[Failure, tuple[str, str]] = {
         "The speech-to-text model could not be loaded. Check the model "
         "settings in the sidebar and let the first-run download finish.",
     ),
+    Failure.CLOUD_NO_KEY: (
+        "Groq API key needed",
+        "The selected model runs on Groq, which needs an API key. Paste one "
+        "into the Cloud section of the sidebar, or pick a local model to keep "
+        "everything on this machine.",
+    ),
+    Failure.CLOUD_AUTH_REJECTED: (
+        "Groq rejected the API key",
+        "The key was refused. Check it for a typo, confirm it has not been "
+        "revoked, and paste it again in the Cloud section of the sidebar.",
+    ),
+    Failure.CLOUD_RATE_LIMITED: (
+        "Groq rate limit reached",
+        "You have used this key's allowance for now (20 requests a minute, "
+        "2000 a day). Wait a moment and try again, or switch to a local model "
+        "to keep dictating.",
+    ),
+    Failure.CLOUD_UNREACHABLE: (
+        "Can't reach Groq",
+        "The transcription request did not get through. Check your internet "
+        "connection, or switch to a local model to work offline.",
+    ),
 }
+
+#: GroqError.kind -> the failure we show the user.
+CLOUD_FAILURES = {
+    "no_key": Failure.CLOUD_NO_KEY,
+    "auth": Failure.CLOUD_AUTH_REJECTED,
+    "rate_limit": Failure.CLOUD_RATE_LIMITED,
+    "network": Failure.CLOUD_UNREACHABLE,
+    "too_large": Failure.CLOUD_UNREACHABLE,
+    "server": Failure.CLOUD_UNREACHABLE,
+}
+
+
+def for_cloud_error(kind: str) -> Diagnostic:
+    """Map a Groq failure kind onto user-facing copy."""
+    return diagnose(CLOUD_FAILURES.get(kind, Failure.CLOUD_UNREACHABLE))
 
 
 def diagnose(kind: Failure) -> Diagnostic:

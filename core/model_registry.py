@@ -7,6 +7,12 @@ from __future__ import annotations
 #   - "cohere_ov"     : Cohere Transcribe OpenVINO IR (manual KV-cache decode)
 #   - "whisper_genai" : Whisper via OpenVINO GenAI WhisperPipeline
 MODELS = {
+    # Cloud: nothing to download, and Whisper large-v3 is more accurate than
+    # anything that fits comfortably on a laptop. Needs a Groq API key.
+    "Groq Whisper Large v3": {
+        "id": "whisper-large-v3",
+        "backend": "groq_whisper",
+    },
     "Cohere-transcribe": {
         # Owner prefix is required: a bare name resolves to no repo and Hugging
         # Face answers 401, which reads like an auth problem rather than a typo.
@@ -19,7 +25,11 @@ MODELS = {
     },
 }
 
-DEFAULT_MODEL_DISPLAY = "Cohere-transcribe"
+DEFAULT_MODEL_DISPLAY = "Groq Whisper Large v3"
+
+#: Backends that call a hosted API instead of loading a local model. They need
+#: no download, but they do need a key and a network.
+CLOUD_BACKENDS = frozenset({"groq_whisper"})
 
 
 def _entry(display_name: str) -> dict:
@@ -32,8 +42,13 @@ def resolve_model_id(display_name: str) -> str:
 
 
 def resolve_backend(display_name: str) -> str:
-    """Return the backend kind ("cohere_ov" or "whisper_genai") for a model."""
+    """Return the backend kind ("cohere_ov", "whisper_genai", "groq_whisper")."""
     return _entry(display_name)["backend"]
+
+
+def is_cloud_model(display_name: str) -> bool:
+    """True when the model runs on a hosted API rather than on this machine."""
+    return resolve_backend(display_name) in CLOUD_BACKENDS
 
 
 def list_model_names() -> list[str]:

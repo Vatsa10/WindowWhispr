@@ -18,7 +18,7 @@ import numpy as np
 
 from core.audio_meter import rms_to_bars
 from core.model_manager import ensure_required_models
-from core.model_registry import resolve_backend
+from core.model_registry import CLOUD_BACKENDS, resolve_backend, resolve_model_id
 
 _log = logging.getLogger("winwhispr.asr")
 
@@ -683,6 +683,31 @@ class AudioCapture:
         return np.concatenate(collected).astype(np.float32, copy=False)
 
 
+class GroqASRBackend:
+    """Whisper large-v3 on Groq.
+
+    Unlike the local backends this is billed and rate limited (20 requests a
+    minute), so the pipeline sends one request per dictation session rather
+    than one per speech segment. Long sessions are split by the client to stay
+    under the upload limit.
+    """
+
+    def __init__(self, model: str = "whisper-large-v3", sample_rate: int = 16000):
+        self._model = model
+        self._sample_rate = sample_rate
+
+    def transcribe(self, audio: np.ndarray) -> str:
+        from core import secrets
+        from core.groq_client import transcribe
+
+        return transcribe(
+            audio,
+            api_key=secrets.get_key("groq_api_key"),
+            model=self._model,
+            sample_rate=self._sample_rate,
+        )
+
+
 class TextPipeline:
     """Queue-based low-overhead speech pipeline.
 
@@ -728,16 +753,47 @@ class TextPipeline:
             threshold=vad_threshold,
             min_silence_ms=min_silence_ms,
         )
-        if resolve_backend(model_display_name) == "whisper_genai":
+        backend = resolve_backend(model_display_name)
+        # Cloud ASR is batched per session: transcribing every VAD segment
+        # separately would burn the request allowance and lose the context that
+        # makes a large model worth calling.
+        self._batch_whole_session = backend in CLOUD_BACKENDS
+        if backend == "groq_whisper":
+            self._asr = GroqASRBackend(resolve_model_id(model_display_name))
+        elif backend == "whisper_genai":
             self._asr = WhisperOVBackend(model_paths["asr_model_dir"], device=device)
         else:
             self._asr = OVASRBackend(model_paths["asr_model_dir"], device=device)
 
         self._buffer = np.empty((0,), dtype=np.float32)
+        # Session-wide audio bookkeeping: lets an empty transcript say whether
+        # the microphone was silent or the model simply heard nothing.
+        self._session_samples = 0
+        self._session_peak = 0.0
+
+    #: Peak sample below which a session counts as silence, not quiet speech.
+    SILENCE_PEAK = 0.005
+
+    def session_audio_stats(self) -> dict:
+        """What the microphone actually delivered during the last session."""
+        return {
+            "samples": self._session_samples,
+            "seconds": round(self._session_samples / float(self._sample_rate), 2),
+            "peak": round(self._session_peak, 4),
+            "silent": self._session_peak < self.SILENCE_PEAK,
+        }
+
+    def _note_audio(self, audio: np.ndarray) -> None:
+        if audio.size == 0:
+            return
+        self._session_samples += int(audio.size)
+        self._session_peak = max(self._session_peak, float(np.max(np.abs(audio))))
 
     def start_capture(self) -> None:
         """Open the continuous microphone stream for a dictation session."""
         self._buffer = np.empty((0,), dtype=np.float32)
+        self._session_samples = 0
+        self._session_peak = 0.0
         try:
             self._capture.start()
         except Exception as exc:  # pragma: no cover - device dependent
@@ -778,11 +834,16 @@ class TextPipeline:
         """
         start = time.time()
         audio = self._capture.capture(seconds=self._READ_SECONDS, stop_event=stop_event)
+        self._note_audio(audio)
         if audio.size:
             self._buffer = (
                 np.concatenate([self._buffer, audio]) if self._buffer.size else audio
             )
         if self._buffer.size == 0:
+            return "", time.time() - start
+
+        if self._batch_whole_session:
+            # Hold everything until flush(): one request, full context.
             return "", time.time() - start
 
         chunks, consumed = self._vad.segment_stream(
@@ -804,12 +865,23 @@ class TextPipeline:
         """
         start = time.time()
         tail = self._capture.drain_available()
+        self._note_audio(tail)
         if tail.size:
             self._buffer = (
                 np.concatenate([self._buffer, tail]) if self._buffer.size else tail
             )
         if self._buffer.size == 0:
             return "", time.time() - start
+
+        if self._batch_whole_session:
+            # One request for the whole utterance. Skipping the VAD split here
+            # is deliberate: a large model handles its own pauses, and every
+            # extra segment would be another billed round trip.
+            audio, self._buffer = self._buffer, np.empty((0,), dtype=np.float32)
+            text = self._asr.transcribe(audio)
+            if self._log_transcript and text:
+                print(f"[WinWhispr][asr] transcript: {text}")
+            return text, time.time() - start
 
         # End of stream == silence, so `chunk` closes the trailing segment.
         chunks = self._vad.chunk(self._buffer)
