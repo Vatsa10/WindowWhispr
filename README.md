@@ -13,9 +13,9 @@ currently has focus.
 - **Standalone native Windows app** — PySide6 (Qt) desktop window, dark theme.
   No browser, no WebView, no web toolchain.
 - **System tray + collapsible settings sidebar**; runs in the background.
-- **Hold `Right Ctrl` to talk**, release to paste. Tap it twice to keep
-  recording hands-free; press `Esc` to throw a session away. The older
-  **`Ctrl+Shift+Space`** press-to-start / press-to-stop hotkey still works.
+- **Two keys, that's it**: hold **`Right Ctrl`** and speak, let go and your
+  words appear. **`Esc`** throws the recording away. (Tap-twice-to-lock and a
+  press-on/press-off combo exist too, both off by default.)
 - **Floating status pill** near the bottom of the screen — a live waveform while
   recording, "Cleaning up…" while it thinks, and the specific problem when
   something goes wrong.
@@ -62,10 +62,15 @@ currently has focus.
 3. **Hold `Right Ctrl`**, say your sentence, and let go. The pill shows a
    waveform while you speak and "Cleaning up…" while WinWhispr tidies the
    transcript; the finished text is pasted at your cursor. Press `Esc` while
-   recording to discard the session.
-   - Tap `Right Ctrl` twice quickly to lock recording **hands-free**; tap again
-     to finish.
-   - The older `Ctrl+Shift+Space` toggle still starts and stops dictation.
+   recording to discard it.
+
+   That is the whole thing. Two optional extras live in **Dictation keys** if
+   you want them: *tap twice to keep recording* (hands-free, no holding), and a
+   *press-on / press-off combo* like the old `Ctrl+Shift+Space`. Both are off by
+   default so there is only ever one way to start.
+
+   > Using a keyboard layout with **AltGr**? Windows sends a fake Ctrl with it.
+   > Change the talk key to `f13` or `right alt` in **Dictation keys**.
 4. Select text anywhere and press `Ctrl+Alt+R` to **reformat** it with the local
    LLM. Open the WinWhispr window to see analytics, the searchable activity log,
    and the settings sidebar (cleanup level, dictionary, dictation keys,
