@@ -1,0 +1,21 @@
+.venv
+*egg-info
+__pycache__
+*.pyc
+
+# Local runtime data (models are multi-GB; the rest is per-user state)
+.models
+.speakers
+*.db
+*.wav
+config.json
+dictionary.json
+snippets.json
+
+# Packaging artifacts
+build/
+dist/
+packaging/installer/Output/
+
+# Reference implementation we ported logic from; kept locally, not shipped.
+WhimprFlow/

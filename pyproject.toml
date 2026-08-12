@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "winwhispr"
+version = "0.1.0"
+description = "Offline Windows dictation prototype with hotkey-driven text injection and analytics."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "comtypes>=1.4.0",
+    "huggingface_hub>=0.24.0",
+    "keyboard>=0.13.5",
+    "librosa>=0.10.0",
+    "numpy>=1.26.0",
+    "onnxruntime>=1.19.0",
+    "openvino>=2024.3.0",
+    "openvino-genai>=2024.3.0",
+    "pyperclip>=1.9.0",
+    "PySide6>=6.6.0",
+    "sounddevice>=0.4.7",
+    "transformers>=4.44.0",
+]
+
+[project.optional-dependencies]
+build = [
+    "pyinstaller>=6.10",
+]
+dev = [
+    "pytest>=8",
+]
+
+[project.scripts]
+winwhispr = "main:main"
+
+[tool.setuptools]
+py-modules = ["main"]
+
+[tool.setuptools.packages.find]
+include = ["core*", "database*", "desktop*"]
