@@ -53,8 +53,26 @@ def test_hold_records_then_finalizes_on_release():
     assert m.phase == FINALIZING
 
 
-def test_short_tap_discards_and_awaits_a_lock():
+def test_short_tap_discards_and_returns_to_idle_by_default():
+    # Lock-on-double-tap is opt-in, so a stray tap just goes away.
     m = DictationMachine()
+    m.step(Down(PTT, 0))
+    actions = m.step(Up(PTT, HOLD_MIN_MS - 1))
+    assert isinstance(actions[0], DiscardCapture)
+    assert m.phase == IDLE
+
+
+def test_second_tap_does_not_lock_unless_enabled():
+    m = DictationMachine()
+    m.step(Down(PTT, 0))
+    m.step(Up(PTT, 50))
+    # The cooldown swallows the immediate re-press; either way, no lock.
+    m.step(Down(PTT, 60))
+    assert m.state.mode is not RecordMode.LOCKED
+
+
+def test_short_tap_awaits_a_lock_when_enabled():
+    m = DictationMachine(allow_lock=True)
     m.step(Down(PTT, 0))
     actions = m.step(Up(PTT, HOLD_MIN_MS - 1))
     assert isinstance(actions[0], DiscardCapture)
@@ -62,7 +80,7 @@ def test_short_tap_discards_and_awaits_a_lock():
 
 
 def test_double_tap_locks_hands_free():
-    m = DictationMachine()
+    m = DictationMachine(allow_lock=True)
     m.step(Down(PTT, 0))
     m.step(Up(PTT, 50))
     actions = m.step(Down(PTT, 50 + DOUBLE_TAP_MS))
@@ -72,7 +90,7 @@ def test_double_tap_locks_hands_free():
 
 
 def test_late_second_tap_does_not_lock():
-    m = DictationMachine()
+    m = DictationMachine(allow_lock=True)
     m.step(Down(PTT, 0))
     m.step(Up(PTT, 50))
     m.step(Tick(50 + DOUBLE_TAP_MS + 1))  # window expires
@@ -80,7 +98,7 @@ def test_late_second_tap_does_not_lock():
 
 
 def test_repress_ends_a_locked_session():
-    m = DictationMachine()
+    m = DictationMachine(allow_lock=True)
     m.step(Down(PTT, 0))
     m.step(Up(PTT, 50))
     m.step(Down(PTT, 100))  # locked
