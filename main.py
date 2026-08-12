@@ -5,7 +5,8 @@ which also runs the background dictation engine (global hotkey + ASR).
 
     python main.py            # native desktop app (default)
     python main.py headless   # engine only, no window (global hotkey)
-    python main.py setup       # download + optimize models, then exit
+    python main.py setup      # download + optimize models, then exit
+    python main.py models     # what is on disk, and how to reclaim it
 """
 
 import sys
@@ -103,6 +104,45 @@ def setup():
     print("[WinWhispr][setup] Done.")
 
 
+def models():
+    """List downloaded models and their disk usage, or delete one.
+
+        python main.py models                  # what is on disk
+        python main.py models --remove NAME    # delete one by name
+        python main.py models --purge-cache    # drop the OpenVINO compile cache
+    """
+    from core import model_store
+
+    config = load_config()
+    active = (str(config.get("asr_model", "")), str(config.get("llm_model", "")))
+
+    args = sys.argv[2:]
+    if "--remove" in args:
+        wanted = args[args.index("--remove") + 1].lower() if len(args) > args.index("--remove") + 1 else ""
+        for model in model_store.installed(active):
+            if wanted and wanted in model.name.lower():
+                if model.in_use:
+                    print(f"[WinWhispr] {model.name} is the configured model; "
+                          f"pick another one in the sidebar first.")
+                    return
+                ok = model_store.remove(model)
+                print(f"[WinWhispr] {'Removed' if ok else 'Could not remove'} "
+                      f"{model.name} ({model.size_mb:.0f} MB)")
+                return
+        print(f"[WinWhispr] No downloaded model matching {wanted!r}.")
+        return
+
+    if "--purge-cache" in args:
+        cache = model_store.compile_cache()
+        ok = model_store.remove(cache)
+        print(f"[WinWhispr] {'Freed' if ok else 'Could not free'} "
+              f"{cache.size_mb:.0f} MB of compile cache "
+              f"(it rebuilds automatically on the next model load).")
+        return
+
+    print(model_store.report(active))
+
+
 if __name__ == "__main__":
     mode = sys.argv[1] if len(sys.argv) > 1 else ""
     print(f"[WinWhispr] Starting mode={mode or 'gui'}")
@@ -110,5 +150,7 @@ if __name__ == "__main__":
         headless()
     elif mode == "setup":
         setup()
+    elif mode == "models":
+        models()
     else:
         main()

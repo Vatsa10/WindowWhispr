@@ -102,13 +102,21 @@ class FasterWhisperEngine:
                 cuda_runtime.ensure()
             from faster_whisper import WhisperModel
 
+            from core import paths
+
             _log.info("loading %s", self._choice.label)
+            # Keep the weights under WinWhispr's own models directory. The
+            # library would otherwise put them in the shared Hugging Face
+            # cache, where they are indistinguishable from every other
+            # project's downloads and nobody can safely reclaim the space.
+            download_root = str(paths.whisper_models_dir())
             try:
                 self._model = WhisperModel(
                     self._choice.model,
                     device=self._choice.device,
                     compute_type=self._choice.compute_type,
                     cpu_threads=self._cpu_threads,
+                    download_root=download_root,
                 )
             except Exception as exc:
                 if self._choice.device != "cuda":
@@ -126,6 +134,7 @@ class FasterWhisperEngine:
                     device="cpu",
                     compute_type="int8",
                     cpu_threads=self._cpu_threads,
+                    download_root=download_root,
                 )
             print(f"[WinWhispr][asr] {self._choice.label} ready — {self._choice.reason}")
             return self._model

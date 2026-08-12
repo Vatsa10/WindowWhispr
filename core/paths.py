@@ -85,6 +85,19 @@ def config_path() -> Path:
     return data_dir() / "config.json"
 
 
+def whisper_models_dir() -> Path:
+    """Where faster-whisper weights live.
+
+    Under WinWhispr's own models directory rather than the shared Hugging Face
+    cache: in the shared cache these files sit among every other project's
+    downloads, so nobody can tell which gigabytes belong to this app or safely
+    delete them.
+    """
+    path = models_dir() / "whisper"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
 def dictionary_path() -> Path:
     """Location of the personal dictionary (names and terms to spell right)."""
     return data_dir() / "dictionary.json"
