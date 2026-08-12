@@ -13,7 +13,7 @@ import threading
 import logging
 from datetime import datetime, timezone
 
-from PySide6.QtCore import QObject, Qt, Signal, Slot
+from PySide6.QtCore import QEasingCurve, QObject, QPropertyAnimation, Qt, Signal, Slot
 from PySide6.QtGui import QAction, QIcon
 from PySide6.QtWidgets import (
     QApplication,
@@ -65,7 +65,7 @@ from desktop.widgets import (
 
 _ICON_PNG = str(paths.asset_path("winwhispr.png"))
 
-_PIPELINE_KEYS = {"hotkey", "vad_threshold", "asr_model", "asr_device", "log_transcript", "min_silence_ms", "max_segment_seconds", "reformat_hotkey", "llm_model", "llm_device", "commit_mode", "cleanup_level", "cleanup_timeout_ms", "per_app_formatting", "cleanup_provider", "groq_cleanup_model", "ptt_enabled", "ptt_key", "cancel_key", "sound_on_start", "input_device", "paste_last_hotkey", "copy_last_hotkey", "autolearn_enabled"}
+_PIPELINE_KEYS = {"hotkey", "vad_threshold", "asr_model", "asr_device", "log_transcript", "min_silence_ms", "max_segment_seconds", "reformat_hotkey", "llm_model", "llm_device", "commit_mode", "cleanup_level", "cleanup_timeout_ms", "per_app_formatting", "cleanup_provider", "groq_cleanup_model", "ptt_enabled", "ptt_key", "cancel_key", "sound_on_start", "input_device", "paste_last_hotkey", "copy_last_hotkey", "autolearn_enabled", "hands_free_double_tap", "toggle_enabled"}
 
 _log = logging.getLogger("winwhispr.gui")
 
@@ -133,6 +133,10 @@ class MainWindow(QMainWindow):
         self._listener: HotkeyListener | None = None
         self._listener_lock = threading.Lock()
         self._collapsed = False
+        #: Whether the user collapsed the sidebar themselves, as opposed to the
+        #: window being too narrow for it. A deliberate choice outlives a resize.
+        self._user_collapsed = False
+        self._auto_collapsed = False
         self._note_cards: list[NoteCard] = []
         # Bootup readiness: the main status chip stays in the "loading" state
         # until BOTH the ASR engine and the reformatter LLM have finished
@@ -146,7 +150,9 @@ class MainWindow(QMainWindow):
         self.setObjectName("Root")
         self.setWindowTitle("WinWhispr")
         self.resize(1180, 760)
-        self.setMinimumSize(900, 620)
+        # Small enough to sit beside the app you are dictating into, which is
+        # the normal way this window gets used. Everything below reflows.
+        self.setMinimumSize(680, 460)
         if os.path.isfile(_ICON_PNG):
             self.setWindowIcon(QIcon(_ICON_PNG))
 
@@ -158,6 +164,14 @@ class MainWindow(QMainWindow):
         root.setSpacing(0)
 
         self._sidebar = self._build_sidebar()
+        # Animated with min/max width rather than setFixedWidth so the panel can
+        # actually move; Qt clamps a fixed width instantly.
+        self._sidebar_anim = QPropertyAnimation(self._sidebar, b"maximumWidth", self)
+        self._sidebar_anim.setDuration(180)
+        self._sidebar_anim.setEasingCurve(QEasingCurve.OutCubic)
+        self._sidebar_anim.valueChanged.connect(
+            lambda value: self._sidebar.setMinimumWidth(int(value))
+        )
         root.addWidget(self._sidebar)
         root.addWidget(self._build_content(), 1)
 
@@ -176,6 +190,10 @@ class MainWindow(QMainWindow):
         # focused — which is nearly always.
         self._pill = FlowPill(theme.COLORS) if self._config.get("pill_enabled", True) else None
 
+        # Lay out for the starting size before anything is shown, so the first
+        # paint is already correct rather than snapping on the first resize.
+        self._apply_breakpoints(self.width())
+
         self._build_tray()
         self._refresh_stats()
         self._load_notes()
@@ -187,7 +205,8 @@ class MainWindow(QMainWindow):
     def _build_sidebar(self) -> QFrame:
         bar = QFrame()
         bar.setObjectName("Sidebar")
-        bar.setFixedWidth(280)
+        bar.setMinimumWidth(280)
+        bar.setMaximumWidth(280)
         outer = QVBoxLayout(bar)
         outer.setContentsMargins(12, 16, 12, 12)
         outer.setSpacing(10)
@@ -222,17 +241,26 @@ class MainWindow(QMainWindow):
         self._nav_label.setObjectName("NavLabel")
         outer.addWidget(self._nav_label)
 
-        # sections
+        # Sections live in their own scroll area: there are more of them than
+        # fit a laptop screen, and the window is meant to be usable at half
+        # height beside whatever you are dictating into.
         self._sidebar_sections = []
+        sections_host = QWidget()
+        sections_col = QVBoxLayout(sections_host)
+        sections_col.setContentsMargins(0, 0, 6, 0)  # room for the scrollbar
+        sections_col.setSpacing(10)
+
+        # Ordered by how often a person actually opens them: first run needs a
+        # key, then the models, then behaviour, then the rarely-touched knobs.
         section_specs = [
-            ("\u25a0", "ASR Model", True, self._build_model_section),
             ("\u2601", "Cloud (Groq)", True, self._build_cloud_section),
+            ("\u25a0", "Speech model", True, self._build_model_section),
             ("\u2728", "Cleanup", True, self._build_cleanup_section),
-            ("\u2726", "Dictionary", False, self._build_dictionary_section),
             ("\u2328", "Dictation keys", False, self._build_behaviour_section),
-            ("\u2261", "VAD Settings", False, self._build_vad_section),
-            ("\u25c9", "Speaker ID", False, self._build_speaker_section),
+            ("\u2726", "Dictionary", False, self._build_dictionary_section),
             ("\u270e", "Reformatter (LLM)", False, self._build_reformat_section),
+            ("\u2261", "Voice detection", False, self._build_vad_section),
+            ("\u25c9", "Speaker ID", False, self._build_speaker_section),
         ]
         for glyph, title, expanded, builder in section_specs:
             section = CollapsibleSection(glyph, title, expanded=expanded)
@@ -245,28 +273,22 @@ class MainWindow(QMainWindow):
                 err = QLabel("Unavailable \u2014 see logs")
                 err.setProperty("class", "FieldLabel")
                 section.add_widget(err)
-            outer.addWidget(section)
+            sections_col.addWidget(section)
             self._sidebar_sections.append(section)
+        sections_col.addStretch(1)
 
-        outer.addStretch(1)
+        self._sidebar_scroll = QScrollArea()
+        self._sidebar_scroll.setWidgetResizable(True)
+        self._sidebar_scroll.setFrameShape(QFrame.NoFrame)
+        self._sidebar_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self._sidebar_scroll.setWidget(sections_host)
+        outer.addWidget(self._sidebar_scroll, 1)
 
-        # footer: hotkey
+        # Footer: the one destructive action, kept away from everything else.
         self._foot = QWidget()
         foot_col = QVBoxLayout(self._foot)
         foot_col.setContentsMargins(2, 8, 2, 2)
         foot_col.setSpacing(6)
-        hk_label = QLabel("GLOBAL HOTKEY")
-        hk_label.setObjectName("NavLabel")
-        foot_col.addWidget(hk_label)
-        self._hotkey_edit = QLineEdit(self._config.get("hotkey", "ctrl+shift+space"))
-        self._hotkey_edit.setPlaceholderText("ctrl+shift+space")
-        self._hotkey_edit.returnPressed.connect(self._apply_hotkey)
-        foot_col.addWidget(self._hotkey_edit)
-        apply_btn = QPushButton("Apply hotkey")
-        apply_btn.setProperty("class", "Ghost")
-        apply_btn.setCursor(Qt.PointingHandCursor)
-        apply_btn.clicked.connect(self._apply_hotkey)
-        foot_col.addWidget(apply_btn)
 
         self._reset_btn = QPushButton("\u21bb  Reset all data")
         self._reset_btn.setProperty("class", "DangerGhost")
@@ -463,6 +485,33 @@ class MainWindow(QMainWindow):
         self._update_cleanup_hint()
 
     def _build_behaviour_section(self, section: CollapsibleSection) -> None:
+        # Two controls, stated as a sentence. Everything else here is opt-in,
+        # so nobody has to learn four key combinations to dictate.
+        summary = QLabel(
+            f"Hold <b>{self._config.get('ptt_key', 'right ctrl').title()}</b> and "
+            f"speak. Let go and your words appear. "
+            f"<b>{self._config.get('cancel_key', 'esc').title()}</b> throws the "
+            f"recording away."
+        )
+        summary.setProperty("class", "Hint")
+        summary.setWordWrap(True)
+        section.add_widget(summary)
+
+        key_label = QLabel("Talk key")
+        key_label.setProperty("class", "FieldLabel")
+        section.add_widget(key_label)
+
+        self._ptt_key_edit = QLineEdit(self._config.get("ptt_key", "right ctrl"))
+        self._ptt_key_edit.setPlaceholderText("right ctrl")
+        self._ptt_key_edit.setToolTip(
+            "Any single key: right ctrl, right alt, f13… Use a key you do not "
+            "type with. On keyboards with AltGr, prefer f13 or right alt."
+        )
+        self._ptt_key_edit.editingFinished.connect(
+            lambda: self._update_config({"ptt_key": self._ptt_key_edit.text().strip()})
+        )
+        section.add_widget(self._ptt_key_edit)
+
         self._ptt_check = QCheckBox("Hold a key to talk")
         self._ptt_check.setChecked(bool(self._config.get("ptt_enabled", True)))
         self._ptt_check.toggled.connect(
@@ -470,20 +519,33 @@ class MainWindow(QMainWindow):
         )
         section.add_widget(self._ptt_check)
 
-        self._ptt_key_edit = QLineEdit(self._config.get("ptt_key", "right ctrl"))
-        self._ptt_key_edit.setPlaceholderText("right ctrl")
-        self._ptt_key_edit.editingFinished.connect(
-            lambda: self._update_config({"ptt_key": self._ptt_key_edit.text().strip()})
-        )
-        section.add_widget(self._ptt_key_edit)
+        extras = QLabel("EXTRA WAYS TO START")
+        extras.setObjectName("NavLabel")
+        section.add_widget(extras)
 
-        hint = QLabel(
-            "Hold to dictate, release to paste. Tap twice to keep it running "
-            "hands-free; Esc throws the session away."
+        self._lock_check = QCheckBox("Tap twice to keep recording")
+        self._lock_check.setToolTip(
+            "Off by default: a mistyped key that starts a recording which does "
+            "not stop when you let go is surprising in the wrong direction."
         )
-        hint.setProperty("class", "Hint")
-        hint.setWordWrap(True)
-        section.add_widget(hint)
+        self._lock_check.setChecked(bool(self._config.get("hands_free_double_tap", False)))
+        self._lock_check.toggled.connect(
+            lambda on: self._update_config({"hands_free_double_tap": bool(on)})
+        )
+        section.add_widget(self._lock_check)
+
+        self._toggle_check = QCheckBox("Also use a press-on / press-off combo")
+        self._toggle_check.setChecked(bool(self._config.get("toggle_enabled", False)))
+        self._toggle_check.toggled.connect(self._on_toggle_enabled)
+        section.add_widget(self._toggle_check)
+
+        self._hotkey_edit = QLineEdit(self._config.get("hotkey", "ctrl+shift+space"))
+        self._hotkey_edit.setPlaceholderText("ctrl+shift+space")
+        self._hotkey_edit.setEnabled(self._toggle_check.isChecked())
+        self._hotkey_edit.editingFinished.connect(
+            lambda: self._update_config({"hotkey": self._hotkey_edit.text().strip()})
+        )
+        section.add_widget(self._hotkey_edit)
 
         mic_label = QLabel("Microphone")
         mic_label.setProperty("class", "FieldLabel")
@@ -514,6 +576,10 @@ class MainWindow(QMainWindow):
         self._autostart_check.setChecked(autostart.is_enabled())
         self._autostart_check.toggled.connect(self._on_autostart_toggled)
         section.add_widget(self._autostart_check)
+
+    def _on_toggle_enabled(self, on: bool) -> None:
+        self._hotkey_edit.setEnabled(bool(on))
+        self._update_config({"toggle_enabled": bool(on)})
 
     def _on_autostart_toggled(self, on: bool) -> None:
         if not autostart.set_enabled(bool(on)):
@@ -734,6 +800,7 @@ class MainWindow(QMainWindow):
         col = QVBoxLayout(page)
         col.setContentsMargins(34, 28, 34, 34)
         col.setSpacing(22)
+        self._content_layout = col
 
         col.addLayout(self._build_header())
         col.addWidget(self._build_metrics())
@@ -795,16 +862,14 @@ class MainWindow(QMainWindow):
         hint_l = QHBoxLayout(hint)
         hint_l.setContentsMargins(14, 8, 14, 8)
         hint_l.setSpacing(8)
-        htext = QLabel("Dictate anywhere")
+        htext = QLabel("Hold to dictate")
         htext.setObjectName("HintText")
         hint_l.addWidget(htext)
-        for i, key in enumerate(self._hotkey_keys()):
-            if i:
-                plus = QLabel("+")
-                plus.setProperty("class", "Hint")
-                hint_l.addWidget(plus)
-            hint_l.addWidget(kbd(key))
+        # Shows the key you actually use, so the reminder can never drift from
+        # the setting.
+        hint_l.addWidget(kbd(self._config.get("ptt_key", "right ctrl").title()))
         self._hotkey_hint = hint
+        self._hint_chip = hint
         row.addWidget(hint)
 
         quit_btn = QPushButton("\u23fb")  # power symbol
@@ -826,18 +891,33 @@ class MainWindow(QMainWindow):
         title.setProperty("class", "SectionTitle")
         col.addWidget(title)
 
-        grid = QGridLayout()
-        grid.setSpacing(14)
+        self._metrics_grid = QGridLayout()
+        self._metrics_grid.setSpacing(14)
         self._card_words = MetricCard("\u25a4", "Words dictated", theme.COLORS["accent"])
         self._card_saved = MetricCard("\u25f7", "Time saved vs typing", theme.COLORS["success"])
         self._card_wpm = MetricCard("\u2197", "Words / minute", theme.COLORS["accent2"])
         self._card_streak = MetricCard("\u25c8", "Day streak", theme.COLORS["amber"])
-        for i, card in enumerate(
-            (self._card_words, self._card_saved, self._card_wpm, self._card_streak)
-        ):
-            grid.addWidget(card, 0, i)
-        col.addLayout(grid)
+        self._metric_cards = (
+            self._card_words, self._card_saved, self._card_wpm, self._card_streak,
+        )
+        self._metric_columns = 0  # forces the first layout pass
+        self._layout_metrics(4)
+        col.addLayout(self._metrics_grid)
         return wrap
+
+    def _layout_metrics(self, columns: int) -> None:
+        """Reflow the metric cards into ``columns`` columns.
+
+        Four cards side by side need ~1100px. Below that they squeeze until the
+        numbers truncate, so they wrap instead.
+        """
+        if columns == self._metric_columns:
+            return
+        self._metric_columns = columns
+        for card in self._metric_cards:
+            self._metrics_grid.removeWidget(card)
+        for index, card in enumerate(self._metric_cards):
+            self._metrics_grid.addWidget(card, index // columns, index % columns)
 
     def _build_activity(self) -> QWidget:
         wrap = QWidget()
@@ -969,6 +1049,8 @@ class MainWindow(QMainWindow):
                     ptt_enabled=self._config.get("ptt_enabled", True),
                     ptt_key=self._config.get("ptt_key", "right ctrl"),
                     cancel_key=self._config.get("cancel_key", "esc"),
+                    hands_free_double_tap=self._config.get("hands_free_double_tap", False),
+                    toggle_enabled=self._config.get("toggle_enabled", False),
                     sound_on_start=self._config.get("sound_on_start", True),
                     paste_last_hotkey=self._config.get("paste_last_hotkey", "ctrl+alt+v"),
                     copy_last_hotkey=self._config.get("copy_last_hotkey", "ctrl+alt+c"),
@@ -1144,10 +1226,6 @@ class MainWindow(QMainWindow):
     def _on_vad_commit(self) -> None:
         self._update_config({"vad_threshold": round(self._vad_slider.value() / 100, 2)})
 
-    def _apply_hotkey(self) -> None:
-        text = self._hotkey_edit.text().strip() or "ctrl+shift+space"
-        self._update_config({"hotkey": text})
-
     def _update_config(self, patch: dict) -> None:
         rebuild = any(k in _PIPELINE_KEYS for k in patch)
         self._config.update(patch)
@@ -1271,18 +1349,70 @@ class MainWindow(QMainWindow):
         self._refresh_stats()
         self._load_notes()
 
+    # ---- responsive layout -------------------------------------------------
+
+    #: Below this window width the sidebar folds itself away, because 280px of
+    #: settings plus a readable activity log does not fit.
+    NARROW_WIDTH = 860
+    #: Below this, four metric cards side by side start truncating their values.
+    METRICS_TWO_COL = 1080
+    METRICS_ONE_COL = 620
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self._apply_breakpoints(self.width())
+
+    def _apply_breakpoints(self, width: int) -> None:
+        """Adapt the layout to the current window width."""
+        if width < self.METRICS_ONE_COL:
+            self._layout_metrics(1)
+        elif width < self.METRICS_TWO_COL:
+            self._layout_metrics(2)
+        else:
+            self._layout_metrics(4)
+
+        # Tighter gutters when there is less room to give away.
+        margin = 20 if width < self.NARROW_WIDTH else 34
+        self._content_layout.setContentsMargins(margin, margin - 6, margin, margin)
+
+        # The search field earns its width only when there is width to spare.
+        self._search_box.setVisible(width >= 720)
+
+        # The hotkey hint is a reminder, not a control: first thing to go.
+        self._hint_chip.setVisible(width >= 1000)
+
+        cramped = width < self.NARROW_WIDTH
+        if cramped != self._auto_collapsed:
+            self._auto_collapsed = cramped
+            # Never fight a deliberate choice: only auto-collapse a sidebar the
+            # user has not already collapsed themselves.
+            if cramped and not self._collapsed:
+                self._set_sidebar_collapsed(True)
+            elif not cramped and self._collapsed and not self._user_collapsed:
+                self._set_sidebar_collapsed(False)
+
     # ---- sidebar collapse -------------------------------------------------
 
     def _toggle_sidebar(self) -> None:
-        self._collapsed = not self._collapsed
-        self._sidebar.setFixedWidth(64 if self._collapsed else 280)
-        self._brand_name.setVisible(not self._collapsed)
-        self._brand_sub.setVisible(not self._collapsed)
-        self._nav_label.setVisible(not self._collapsed)
-        self._foot.setVisible(not self._collapsed)
-        self._collapse_btn.setText("\u276f" if self._collapsed else "\u276e")
+        self._user_collapsed = not self._collapsed
+        self._set_sidebar_collapsed(not self._collapsed)
+
+    def _set_sidebar_collapsed(self, collapsed: bool) -> None:
+        self._collapsed = collapsed
+        target = 64 if collapsed else 280
+        self._brand_name.setVisible(not collapsed)
+        self._brand_sub.setVisible(not collapsed)
+        self._nav_label.setVisible(not collapsed)
+        self._foot.setVisible(not collapsed)
+        self._collapse_btn.setText("\u276f" if collapsed else "\u276e")
         for section in self._sidebar_sections:
-            section.set_mini(self._collapsed)
+            section.set_mini(collapsed)
+
+        # Ease-out, under 300ms: the panel should arrive as fast as the click.
+        self._sidebar_anim.stop()
+        self._sidebar_anim.setStartValue(self._sidebar.width())
+        self._sidebar_anim.setEndValue(target)
+        self._sidebar_anim.start()
 
     # ---- helpers ----------------------------------------------------------
 
