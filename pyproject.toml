@@ -32,6 +32,14 @@ build = [
 dev = [
     "pytest>=8",
 ]
+# NVIDIA GPU support. CTranslate2 needs cuBLAS and cuDNN 9 at runtime; NVIDIA
+# ships both as wheels, so no CUDA toolkit install is required. Installed on
+# demand for machines that have an NVIDIA GPU — see core/asr/cuda_runtime.py,
+# which puts these on the Windows DLL search path.
+cuda = [
+    "nvidia-cublas-cu12>=12.3",
+    "nvidia-cudnn-cu12>=9.0",
+]
 
 [project.scripts]
 winwhispr = "main:main"

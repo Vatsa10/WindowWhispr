@@ -40,6 +40,8 @@ for _pkg in (
     # default location inside a frozen bundle is read-only.
     "comtypes",
     "keyring",
+    "faster_whisper",
+    "ctranslate2",
 ):
     try:
         d, b, h = collect_all(_pkg)
@@ -80,6 +82,17 @@ _hiddenimports += [
     "core.cleanup.orchestrator",
     "core.cleanup.prompts",
     "core.cleanup.provider_local",
+    "core.cleanup.deterministic",
+    "core.asr",
+    "core.asr.engine",
+    "core.asr.faster_whisper_engine",
+    "core.asr.openvino_engine",
+    "core.asr.pipeline",
+    "core.asr.probe",
+    "core.asr.remote_engine",
+    "core.asr.tiering",
+    "faster_whisper",
+    "ctranslate2",
     "core.autostart",
     "core.commands",
     "core.groq_client",

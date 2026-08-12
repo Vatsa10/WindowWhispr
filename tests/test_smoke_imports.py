@@ -11,8 +11,12 @@ import importlib
 import pytest
 
 PURE_MODULES = [
+    "core.asr.engine",
+    "core.asr.pipeline",
+    "core.asr.tiering",
     "core.audio_meter",
     "core.cleanup",
+    "core.cleanup.deterministic",
     "core.cleanup.gates",
     "core.cleanup.levels",
     "core.cleanup.normalize",

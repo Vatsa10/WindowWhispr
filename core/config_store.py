@@ -39,12 +39,15 @@ DEFAULT_CONFIG = {
     # default: an aggressive default is the top source of "it changed what I
     # said" complaints. "none" pastes the raw transcript with no model call.
     "cleanup_level": "light",
-    # "local" runs the on-device LLM; "groq" sends the transcript to Groq and
-    # falls back to local when no key is stored. Groq is the default on
-    # measured latency: ~0.3s versus ~3s for the 350M local model, which also
-    # gets the edit wrong often enough that the gates reject it.
-    # The API key itself lives in Windows Credential Manager, never here.
-    "cleanup_provider": "groq",
+    # Deterministic rules always run: fillers, stutters, spoken punctuation and
+    # capitalization, in microseconds and offline. This setting is only about
+    # the *optional* language model on top, for spoken self-corrections and
+    # per-app tone.
+    #   "none"  - rules only. Offline, instant. The default.
+    #   "local" - the on-device LLM. Measured ~3s and often wrong at 350M.
+    #   "groq"  - hosted, ~0.3s, but the transcript leaves the machine.
+    # Any API key lives in Windows Credential Manager, never here.
+    "cleanup_provider": "none",
     "groq_cleanup_model": "llama-3.3-70b-versatile",
     "cleanup_timeout_ms": 4000,
     "per_app_formatting": True,

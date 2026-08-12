@@ -14,7 +14,7 @@ import time
 from concurrent.futures import TimeoutError as FutureTimeout
 from dataclasses import dataclass
 
-from core.cleanup import CleanupContext, build_messages, evaluate_gates
+from core.cleanup import CleanupContext, build_messages, deterministic, evaluate_gates
 from core.cleanup.gates import GateReason
 from core.cleanup.normalize import post_process, pre_normalize_layout
 
@@ -49,8 +49,13 @@ def run_cleanup(raw: str, ctx: CleanupContext, provider, timeout_ms: int = DEFAU
     # Spoken layout cues become opaque sentinels before the model sees them, and
     # real breaks after. raw_out is the fallback text with the sentinels already
     # resolved, so a fallback never pastes a literal "[[NL]]".
+    #
+    # The deterministic rules run first and always: fillers, stutters, spoken
+    # punctuation and capitalization need no model, cost microseconds, and are
+    # the same every time. Whatever the LLM does or fails to do, this much is
+    # already done — so "cleanup off" still means clean text.
     raw_norm = pre_normalize_layout(raw)
-    raw_out = post_process(raw_norm)
+    raw_out = deterministic.clean(post_process(raw_norm))
 
     if ctx.level.bypasses_llm():
         return CleanupResult(text=raw_out, used_raw=True, reason="level_none",

@@ -134,6 +134,7 @@ class HotkeyListener:
             max_segment_seconds=max_segment_seconds,
             on_level=on_level,
             input_device=input_device or None,
+            stream_segments=((commit_mode or DEFAULT_COMMIT_MODE) == COMMIT_STREAM),
         )
         self._reformat_hotkey = reformat_hotkey or DEFAULT_REFORMAT_HOTKEY
         self._reformatter = Reformatter(
@@ -287,7 +288,9 @@ class HotkeyListener:
             discarded = self._discard.is_set()
             if discarded:
                 # Cancelled mid-session: the audio and the transcript both go in
-                # the bin, and nothing is pasted or logged.
+                # the bin, and nothing is pasted or logged. Any transcription
+                # still running in the background is dropped with it.
+                self._pipeline.discard_session()
                 final_text = ""
                 raw_text = ""
             elif raw_text and not streaming:
@@ -305,10 +308,12 @@ class HotkeyListener:
                 # feels slow" is unactionable: transcription and cleanup are
                 # different problems with different fixes.
                 waited = (time.time() - wait_start) * 1000
+                timing = self._pipeline.last_session_timing()
                 print(
                     f"[WinWhispr][timing] spoke {duration:.1f}s · "
-                    f"asr {asr_ms:.0f}ms · after-release {waited:.0f}ms "
-                    f"({self._pipeline_label()})"
+                    f"asr tail {timing['tail_ms']}ms "
+                    f"({timing['pipelined_segments']} segments done while speaking) · "
+                    f"after-release {waited:.0f}ms ({self._pipeline_label()})"
                 )
 
         pending_key = None if discarded else (getattr(self, "_last_commit", None) or {}).get("key")
@@ -368,7 +373,14 @@ class HotkeyListener:
             return raw_text
 
     def _build_cleanup_provider(self, choice: str, groq_model: str | None):
-        """Pick the cleanup backend. Unknown values fall back to local."""
+        """Pick the optional LLM layer. None means rules only.
+
+        The deterministic rules are not a provider — they always run inside the
+        orchestrator, so there is no configuration in which cleanup does
+        nothing at all.
+        """
+        if str(choice).lower() in ("none", "off", "", "deterministic"):
+            return None
         if str(choice).lower() == "groq":
             from core.cleanup.provider_groq import GroqCleanupProvider
             from core.groq_client import DEFAULT_CHAT_MODEL
@@ -385,7 +397,7 @@ class HotkeyListener:
 
     def _pipeline_label(self) -> str:
         """Which engines this session used, for the timing line."""
-        asr = getattr(self._pipeline, "_model_display_name", "?")
+        asr = getattr(self._pipeline, "engine_label", "?")
         cleanup = getattr(self._cleanup_provider, "id", "?")
         return f"asr={asr}, cleanup={cleanup}"
 
@@ -495,6 +507,17 @@ class HotkeyListener:
                 self._on_diagnostic(diag.headline, diag.detail)
             except Exception as exc:  # pragma: no cover - callback guard
                 print(f"[WinWhispr][hotkey] on_diagnostic callback failed: {exc}")
+
+    def _warm_asr(self):
+        """Load and exercise the speech model in the background at startup."""
+        started = time.time()
+        try:
+            self._pipeline.warmup()
+            print(f"[WinWhispr][asr] ready in {time.time() - started:.1f}s "
+                  f"({self._pipeline.engine_label})")
+        except Exception as exc:  # pragma: no cover - model/hardware dependent
+            print(f"[WinWhispr][asr] warmup failed: {exc}")
+            self._report(Failure.ASR_UNAVAILABLE)
 
     def _load_reformatter(self):
         """Warm up the reformatter LLM in the background and report status."""
@@ -788,7 +811,12 @@ class HotkeyListener:
         self._machine_thread = threading.Thread(target=self._machine_loop, daemon=True)
         self._machine_thread.start()
 
-        # Warm up the reformatter LLM without blocking dictation startup.
+        # Warm the speech model before the first dictation rather than during
+        # it: loading weights and building CUDA kernels costs seconds, and the
+        # user should never pay that while holding the key.
+        threading.Thread(target=self._warm_asr, daemon=True).start()
+
+        # Same for the reformatter LLM, if one is configured.
         self._llm_thread = threading.Thread(target=self._load_reformatter, daemon=True)
         self._llm_thread.start()
 

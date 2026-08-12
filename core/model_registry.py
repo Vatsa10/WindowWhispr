@@ -7,6 +7,13 @@ from __future__ import annotations
 #   - "cohere_ov"     : Cohere Transcribe OpenVINO IR (manual KV-cache decode)
 #   - "whisper_genai" : Whisper via OpenVINO GenAI WhisperPipeline
 MODELS = {
+    # The default: pick a local model to fit this machine — a distilled large
+    # model on a GPU, small.en on a many-core CPU, base.en on a typical laptop.
+    # Thresholds and the measurements behind them live in core/asr/tiering.py.
+    "Automatic (recommended)": {
+        "id": "auto",
+        "backend": "faster_whisper",
+    },
     # Cloud: nothing to download, and Whisper large-v3 is more accurate than
     # anything that fits comfortably on a laptop. Needs a Groq API key.
     # Measured on an 8s clip: turbo 466ms, large-v3 526ms, the local model
@@ -47,7 +54,7 @@ MODELS = {
     },
 }
 
-DEFAULT_MODEL_DISPLAY = "Groq Whisper Turbo"
+DEFAULT_MODEL_DISPLAY = "Automatic (recommended)"
 
 #: Backends that call a hosted API instead of loading a local model. They need
 #: no download, but they do need a key and a network.

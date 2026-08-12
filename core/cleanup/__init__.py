@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from core.cleanup import gates, levels, normalize, prompts
+from core.cleanup import deterministic, gates, levels, normalize, prompts
 from core.cleanup.gates import GateReason, GateVerdict
 from core.cleanup.gates import evaluate as evaluate_gates
 from core.cleanup.levels import DEFAULT_LEVEL, CleanupLevel
@@ -26,6 +26,7 @@ __all__ = [
     "VocabEntry",
     "assemble_user_message",
     "build_messages",
+    "deterministic",
     "evaluate_gates",
     "gates",
     "levels",

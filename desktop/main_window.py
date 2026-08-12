@@ -394,6 +394,13 @@ class MainWindow(QMainWindow):
         self._refresh_groq_key_status()
         self._rebuild_engine()
 
+    #: The optional language model on top of the always-on rules.
+    _CLEANUP_PROVIDERS = [
+        ("Rules only — instant, offline", "none"),
+        ("Local model — slower, handles corrections", "local"),
+        ("Groq — fast, leaves this machine", "groq"),
+    ]
+
     _CLEANUP_LEVELS = [
         ("None", "none", "Paste exactly what you said, including mistakes."),
         ("Light (recommended)", "light", "Remove filler words and fix grammar."),
@@ -426,16 +433,21 @@ class MainWindow(QMainWindow):
         section.add_widget(run_label)
 
         self._cleanup_provider_combo = QComboBox()
-        self._cleanup_provider_combo.addItems(["This machine", "Groq (cloud)"])
+        for title, _value in self._CLEANUP_PROVIDERS:
+            self._cleanup_provider_combo.addItem(title)
+        values = [value for _t, value in self._CLEANUP_PROVIDERS]
+        current = str(self._config.get("cleanup_provider", "none")).lower()
         self._cleanup_provider_combo.setCurrentIndex(
-            1 if str(self._config.get("cleanup_provider", "local")) == "groq" else 0
+            values.index(current) if current in values else 0
         )
         self._cleanup_provider_combo.currentIndexChanged.connect(
-            lambda i: self._update_config({"cleanup_provider": "groq" if i else "local"})
+            lambda i: self._update_config({"cleanup_provider": values[i]})
         )
         self._cleanup_provider_combo.setToolTip(
-            "Groq is far better at self-corrections and much faster than the "
-            "small local model — but the transcript leaves this machine."
+            "Filler words, stutters, spoken punctuation and capitalization are "
+            "always handled on this machine, instantly. A language model adds "
+            "spoken self-corrections and per-app tone — at a cost in latency, "
+            "or in privacy if you pick the cloud."
         )
         section.add_widget(self._cleanup_provider_combo)
 
