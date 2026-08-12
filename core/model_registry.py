@@ -8,6 +8,8 @@ from __future__ import annotations
 #   - "whisper_genai" : Whisper via OpenVINO GenAI WhisperPipeline
 MODELS = {
     "Cohere-transcribe": {
+        # Owner prefix is required: a bare name resolves to no repo and Hugging
+        # Face answers 401, which reads like an auth problem rather than a typo.
         "id": "Aditya02/cohere-transcribe-03-2026-ov-fp16",
         "backend": "cohere_ov",
     },

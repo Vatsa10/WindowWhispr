@@ -983,6 +983,10 @@ class MainWindow(QMainWindow):
     def _on_error(self, message: str) -> None:
         self._set_dot(theme.COLORS["danger"])
         self._status_text.setText("Engine error")
+        # "Engine error" alone sends people to the log; the first line of the
+        # exception usually names the actual problem (model download, device).
+        first_line = (message or "").strip().splitlines()[0] if message else ""
+        self._status_text.setToolTip(first_line or "See the log for details.")
         self._loading_bar.setVisible(False)
         self._set_engine_controls_enabled(True)
         _log.error("Engine error reported to UI: %s", message)
