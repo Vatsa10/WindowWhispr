@@ -84,6 +84,37 @@ def test_http_status_maps_to_kind(status, kind):
     assert groq_client._http_error(_http_error(status)).kind == kind
 
 
+def test_cloudflare_block_is_not_reported_as_a_bad_key():
+    # A 403 from Cloudflare's block page (no JSON error body) means the request
+    # never reached Groq. Calling it "bad key" sends people to fix a good key.
+    exc = urllib.error.HTTPError(
+        "u", 403, "Forbidden", {}, io.BytesIO(b"error code: 1010")
+    )
+    error = groq_client._http_error(exc)
+    assert error.kind == GroqError.BLOCKED
+    assert diagnostics.for_cloud_error(error.kind).headline == "Request blocked before Groq"
+
+
+def test_real_403_from_groq_is_still_an_auth_error():
+    exc = _http_error(403, {"error": {"message": "Invalid API Key"}})
+    assert groq_client._http_error(exc).kind == GroqError.AUTH
+
+
+def test_requests_identify_the_app(monkeypatch):
+    # The default urllib User-Agent is what got the app blocked in the first
+    # place, so every request must carry a real one.
+    seen = {}
+
+    def fake_urlopen(request, timeout=0):
+        seen.update({k.lower(): v for k, v in request.header_items()})
+        raise urllib.error.URLError("stop here")
+
+    monkeypatch.setattr(groq_client.urllib.request, "urlopen", fake_urlopen)
+    with pytest.raises(GroqError):
+        groq_client.chat([], api_key="k")
+    assert "winwhispr" in seen.get("user-agent", "").lower()
+
+
 def test_network_failure_maps_to_network(monkeypatch):
     def boom(_request, timeout=0):
         raise urllib.error.URLError("offline")

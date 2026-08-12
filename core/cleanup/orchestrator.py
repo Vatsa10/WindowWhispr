@@ -60,7 +60,7 @@ def run_cleanup(raw: str, ctx: CleanupContext, provider, timeout_ms: int = DEFAU
                              latency_ms=elapsed_ms())
 
     try:
-        messages = build_messages(raw_norm, ctx)
+        messages = build_messages(raw_norm, ctx, few_shot=getattr(provider, "few_shot", None))
         model_out = _call_with_timeout(provider, messages, timeout_ms)
     except FutureTimeout:
         # The orphaned call keeps running (a local OpenVINO generate cannot be

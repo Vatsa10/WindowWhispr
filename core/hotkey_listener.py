@@ -350,8 +350,13 @@ class HotkeyListener:
         if str(choice).lower() == "groq":
             from core.cleanup.provider_groq import GroqCleanupProvider
             from core.groq_client import DEFAULT_CHAT_MODEL
+            from core.secrets import has_key
 
-            return GroqCleanupProvider(groq_model or DEFAULT_CHAT_MODEL)
+            if has_key("groq_api_key"):
+                return GroqCleanupProvider(groq_model or DEFAULT_CHAT_MODEL)
+            # No key: quietly use what is available rather than failing every
+            # cleanup and pasting raw for reasons the user cannot see.
+            print("[WinWhispr][cleanup] no Groq key — using the local model")
         # Local shares the reformatter's warm pipeline, so it costs no extra
         # model load and the two can never generate at the same time.
         return LocalCleanupProvider(self._reformatter)

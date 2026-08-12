@@ -30,6 +30,7 @@ class Failure(str, Enum):
     CLOUD_NO_KEY = "cloud_no_key"
     CLOUD_AUTH_REJECTED = "cloud_auth_rejected"
     CLOUD_RATE_LIMITED = "cloud_rate_limited"
+    CLOUD_BLOCKED = "cloud_blocked"
     CLOUD_UNREACHABLE = "cloud_unreachable"
 
 
@@ -94,6 +95,12 @@ _COPY: dict[Failure, tuple[str, str]] = {
         "2000 a day). Wait a moment and try again, or switch to a local model "
         "to keep dictating.",
     ),
+    Failure.CLOUD_BLOCKED: (
+        "Request blocked before Groq",
+        "Something between this machine and Groq refused the request — often a "
+        "VPN, a corporate proxy, or network filtering. Your API key is fine. "
+        "Try a different network, or switch to a local model.",
+    ),
     Failure.CLOUD_UNREACHABLE: (
         "Can't reach Groq",
         "The transcription request did not get through. Check your internet "
@@ -106,6 +113,7 @@ CLOUD_FAILURES = {
     "no_key": Failure.CLOUD_NO_KEY,
     "auth": Failure.CLOUD_AUTH_REJECTED,
     "rate_limit": Failure.CLOUD_RATE_LIMITED,
+    "blocked": Failure.CLOUD_BLOCKED,
     "network": Failure.CLOUD_UNREACHABLE,
     "too_large": Failure.CLOUD_UNREACHABLE,
     "server": Failure.CLOUD_UNREACHABLE,

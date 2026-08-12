@@ -75,15 +75,22 @@ def wrap_transcript(raw: str) -> str:
     return f"<USER_MESSAGE>\n{raw}\n</USER_MESSAGE>"
 
 
-def build_messages(raw: str, ctx: CleanupContext) -> list[CleanupMsg]:
+def build_messages(raw: str, ctx: CleanupContext,
+                   few_shot: int | None = None) -> list[CleanupMsg]:
     """The full ordered message list for a cleanup request.
 
     System prompt, then the few-shot demonstration turns (so small models
     actually produce newlines, lists and resolved self-corrections instead of
     just being *told* to), then the real transcript with its vocab and context.
+
+    ``few_shot`` caps how many demonstrations are sent. A small local model
+    needs all of them; a large hosted one follows the instructions from the
+    system prompt alone, and every example it does not need is latency and
+    tokens-per-minute spent for nothing.
     """
     msgs = [CleanupMsg("system", prompts.system_for(ctx.level, ctx.app_name))]
-    for user_text, assistant_text in prompts.FEW_SHOT:
+    examples = prompts.FEW_SHOT if few_shot is None else prompts.FEW_SHOT[:max(few_shot, 0)]
+    for user_text, assistant_text in examples:
         msgs.append(CleanupMsg("user", wrap_transcript(user_text)))
         msgs.append(CleanupMsg("assistant", assistant_text))
     msgs.append(CleanupMsg("user", assemble_user_message(raw, ctx)))

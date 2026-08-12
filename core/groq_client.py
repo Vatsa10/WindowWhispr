@@ -34,12 +34,18 @@ MAX_CHUNK_SECONDS = 480
 
 REQUEST_TIMEOUT = 60
 
+#: Identify the app. Without this urllib sends "Python-urllib/3.x", which
+#: Cloudflare blocks outright (HTTP 403, error 1010) before Groq ever sees the
+#: request — indistinguishable from a rejected key unless you read the body.
+USER_AGENT = "WinWhispr/0.1.0 (+https://github.com/Vatsa10/WindowWhispr)"
+
 
 class GroqError(RuntimeError):
     """A Groq request failed. ``kind`` says how."""
 
     NO_KEY = "no_key"
     AUTH = "auth"
+    BLOCKED = "blocked"
     RATE_LIMIT = "rate_limit"
     TOO_LARGE = "too_large"
     SERVER = "server"
@@ -91,6 +97,8 @@ def chat(messages, api_key: str, model: str = DEFAULT_CHAT_MODEL,
         headers={
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
+            "User-Agent": USER_AGENT,
+            "Accept": "application/json",
         },
         method="POST",
     )
@@ -147,6 +155,8 @@ def _post_multipart(url: str, api_key: str, fields: dict, wav: bytes) -> dict:
         headers={
             "Authorization": f"Bearer {api_key}",
             "Content-Type": f"multipart/form-data; boundary={boundary}",
+            "User-Agent": USER_AGENT,
+            "Accept": "application/json",
         },
         method="POST",
     )
@@ -167,12 +177,20 @@ def _send(request) -> dict:
 
 def _http_error(exc) -> GroqError:
     status = getattr(exc, "code", 0)
+    body = ""
     detail = ""
     try:
         body = exc.read().decode("utf-8", "replace")
         detail = (json.loads(body).get("error", {}) or {}).get("message", "") or body[:200]
     except Exception:
         pass
+    if status == 403 and "error code:" in body.lower():
+        # Cloudflare's own block page, not a Groq response. Calling this "bad
+        # key" sends people off checking a key that was fine all along.
+        return GroqError(
+            GroqError.BLOCKED,
+            f"The request was blocked before reaching Groq ({body.strip()[:80]}).",
+        )
     if status in (401, 403):
         return GroqError(GroqError.AUTH, detail or "Groq rejected the API key.")
     if status == 429:

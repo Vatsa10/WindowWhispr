@@ -18,6 +18,21 @@ def test_message_shape():
         assert msg.role == ("user" if i % 2 == 0 else "assistant")
 
 
+def test_few_shot_can_be_capped():
+    # Hosted models get a trimmed prompt: the free tier's real ceiling is
+    # tokens per minute, so demonstrations they do not need cost throughput.
+    msgs = build_messages("hello", CleanupContext(), few_shot=4)
+    assert len(msgs) == 1 + 2 * 4 + 1
+    assert msgs[0].role == "system"
+    assert msgs[-1].role == "user"
+
+
+def test_few_shot_zero_still_sends_the_transcript():
+    msgs = build_messages("hello", CleanupContext(), few_shot=0)
+    assert len(msgs) == 2
+    assert "hello" in msgs[-1].content
+
+
 def test_few_shot_keeps_the_anti_over_edit_anchors():
     outputs = [out for _, out in FEW_SHOT]
     assert "I actually really liked the new design." in outputs
