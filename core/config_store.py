@@ -45,10 +45,16 @@ DEFAULT_CONFIG = {
     "groq_cleanup_model": "llama-3.3-70b-versatile",
     "cleanup_timeout_ms": 4000,
     "per_app_formatting": True,
-    # Hold-to-talk, alongside the press-to-toggle hotkey above.
+    # Dictation controls. The default is deliberately just two keys: hold to
+    # talk, Esc to discard. The other two modes are real features but they make
+    # the app harder to explain, so they are opt-in.
     "ptt_enabled": True,
     "ptt_key": "right ctrl",
     "cancel_key": "esc",
+    # Tap the talk key twice to keep recording without holding it.
+    "hands_free_double_tap": False,
+    # The older press-to-start / press-to-stop chord (see "hotkey" above).
+    "toggle_enabled": False,
     # Floating status pill near the bottom of the screen.
     "pill_enabled": True,
     "sound_on_start": True,

@@ -60,11 +60,15 @@ class State:
 class DictationMachine:
     """Owns the state and the bookkeeping the reducer needs."""
 
-    def __init__(self):
+    def __init__(self, allow_lock: bool = False):
         self.state = State()
         self._next_session = 1
         #: When the last session ended, for cooldown debouncing.
         self._last_end_ms: int | None = None
+        # Double-tap-to-lock is off by default. It is a genuinely useful mode,
+        # but as a default it turns a mistyped key into a recording that does
+        # not stop when you let go — surprising in exactly the wrong direction.
+        self._allow_lock = bool(allow_lock)
 
     # --- public ------------------------------------------------------------
 
@@ -128,10 +132,14 @@ class DictationMachine:
                 held = event.at_ms - state.started_ms
                 if held >= HOLD_MIN_MS:
                     return self._finalize(state.session)
-                # Too short to be speech: throw it away, then watch for the
-                # second tap that would lock hands-free recording.
+                # Too short to be speech: throw it away.
                 session = state.session
-                self.state = State(phase=AWAITING_LOCK, tap_up_ms=event.at_ms)
+                if self._allow_lock:
+                    # Watch for the second tap that locks hands-free recording.
+                    self.state = State(phase=AWAITING_LOCK, tap_up_ms=event.at_ms)
+                else:
+                    self.state = State()
+                    self._last_end_ms = event.at_ms
                 return [DiscardCapture(session), ShowBar(BarState.IDLE)]
             return []
 

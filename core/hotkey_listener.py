@@ -111,6 +111,8 @@ class HotkeyListener:
         ptt_enabled=True,
         ptt_key=DEFAULT_PTT_KEY,
         cancel_key=DEFAULT_CANCEL_KEY,
+        hands_free_double_tap=False,
+        toggle_enabled=False,
         sound_on_start=True,
         paste_last_hotkey=DEFAULT_PASTE_LAST_HOTKEY,
         copy_last_hotkey=DEFAULT_COPY_LAST_HOTKEY,
@@ -155,8 +157,10 @@ class HotkeyListener:
         # field has focus, which can be a password box or a banking form.
         self._autolearn_enabled = bool(autolearn_enabled)
         self._ptt_enabled = bool(ptt_enabled)
-        self._ptt_key = ptt_key or DEFAULT_PTT_KEY
-        self._cancel_key = cancel_key or DEFAULT_CANCEL_KEY
+        # Compared against the key event's own name, so store it normalized.
+        self._ptt_key = (ptt_key or DEFAULT_PTT_KEY).strip().lower()
+        self._cancel_key = (cancel_key or DEFAULT_CANCEL_KEY).strip().lower()
+        self._toggle_enabled = bool(toggle_enabled)
         self._sound_on_start = bool(sound_on_start)
         self._paste_last_hotkey = paste_last_hotkey
         self._copy_last_hotkey = copy_last_hotkey
@@ -178,7 +182,7 @@ class HotkeyListener:
         # The state machine owns hold/tap/lock/cancel/cooldown semantics. Key
         # events and ticks arrive on _events; _machine_loop is the only thread
         # that touches the machine, so the state needs no lock.
-        self._machine = DictationMachine()
+        self._machine = DictationMachine(allow_lock=bool(hands_free_double_tap))
         self._events: queue.Queue = queue.Queue()
         self._machine_thread = None
         # Windows repeats WM_KEYDOWN while a key is held; this collapses the
@@ -568,20 +572,33 @@ class HotkeyListener:
     def _post(self, event):
         self._events.put(event)
 
-    def _on_ptt_down(self, _event=None):
-        if self._ptt_down:
-            return  # key auto-repeat, not a new press
-        self._ptt_down = True
-        self._post(Down(Binding.PUSH_TO_TALK, self._now_ms()))
+    def _on_key_event(self, event):
+        """Raw keyboard hook: match on the event's own name.
 
-    def _on_ptt_up(self, _event=None):
-        if not self._ptt_down:
-            return  # stray release (e.g. the key was down before we hooked it)
-        self._ptt_down = False
-        self._post(Up(Binding.PUSH_TO_TALK, self._now_ms()))
+        Not ``on_press_key``: that resolves a key name to scan codes, and
+        ``key_to_scan_codes("right ctrl")`` includes 29 — which is LEFT ctrl.
+        Hooking it made either Ctrl start dictation. The event's resolved name
+        distinguishes them properly, and it also names AltGr as "alt gr"
+        instead of the fake left-ctrl press Windows sends with it.
+        """
+        name = (getattr(event, "name", "") or "").lower()
+        pressed = getattr(event, "event_type", None) == "down"
 
-    def _on_cancel_key(self, _event=None):
-        self._post(Cancel(self._now_ms()))
+        if name == self._ptt_key:
+            if pressed:
+                if self._ptt_down:
+                    return  # key auto-repeat, not a new press
+                self._ptt_down = True
+                self._post(Down(Binding.PUSH_TO_TALK, self._now_ms()))
+            else:
+                if not self._ptt_down:
+                    return  # stray release (key was down before we hooked it)
+                self._ptt_down = False
+                self._post(Up(Binding.PUSH_TO_TALK, self._now_ms()))
+            return
+
+        if pressed and name == self._cancel_key:
+            self._post(Cancel(self._now_ms()))
 
     def _on_trigger(self):
         """The legacy press-to-start / press-to-stop chord."""
@@ -686,21 +703,22 @@ class HotkeyListener:
 
     def _register_hooks(self) -> None:
         """Install the global hooks. Raises if any of them fails."""
-        keyboard.add_hotkey(self._hotkey, self._on_trigger)
-        print(f"[WinWhispr] Listening for hotkey: {self._hotkey}")
+        if self._ptt_enabled:
+            # One raw hook, never suppressing: the keys keep working normally
+            # for every other app.
+            keyboard.hook(self._on_key_event, suppress=False)
+            print(f"[WinWhispr] Hold to talk: {self._ptt_key} "
+                  f"({self._cancel_key} discards)")
+        if self._toggle_enabled:
+            keyboard.add_hotkey(self._hotkey, self._on_trigger)
+            print(f"[WinWhispr] Toggle hotkey: {self._hotkey}")
         if self._reformat_hotkey:
             keyboard.add_hotkey(self._reformat_hotkey, self._on_reformat)
-            print(f"[WinWhispr] Listening for reformat hotkey: {self._reformat_hotkey}")
+            print(f"[WinWhispr] Reformat hotkey: {self._reformat_hotkey}")
         if self._paste_last_hotkey:
             keyboard.add_hotkey(self._paste_last_hotkey, self._on_paste_last)
         if self._copy_last_hotkey:
             keyboard.add_hotkey(self._copy_last_hotkey, self._on_copy_last)
-        if self._ptt_enabled:
-            # Non-suppressing: the key keeps working normally for everything else.
-            keyboard.on_press_key(self._ptt_key, self._on_ptt_down, suppress=False)
-            keyboard.on_release_key(self._ptt_key, self._on_ptt_up, suppress=False)
-            keyboard.on_press_key(self._cancel_key, self._on_cancel_key, suppress=False)
-            print(f"[WinWhispr] Hold to talk: {self._ptt_key} (Esc cancels)")
 
     def _run(self):
         """Install the hooks, retrying forever, then keep them alive.
