@@ -48,10 +48,6 @@ currently has focus.
 - **Reset all data** button in the sidebar to wipe usage metrics and the
   activity log.
 
-## Demo
-[![WinWhispr Demo](https://img.youtube.com/vi/zu0Bpnlvnz0/0.jpg)](https://youtu.be/zu0Bpnlvnz0)
-
-
 ## How to use
 
 1. Install WinWhispr (see [Installation](#installation)) and let the first-run

@@ -760,6 +760,12 @@ class TextPipeline:
         self._batch_whole_session = backend in CLOUD_BACKENDS
         if backend == "groq_whisper":
             self._asr = GroqASRBackend(resolve_model_id(model_display_name))
+        elif backend == "faster_whisper":
+            from core.asr_faster_whisper import FasterWhisperBackend
+
+            self._asr = FasterWhisperBackend(
+                resolve_model_id(model_display_name), device=device
+            )
         elif backend == "whisper_genai":
             self._asr = WhisperOVBackend(model_paths["asr_model_dir"], device=device)
         else:

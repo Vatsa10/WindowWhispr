@@ -243,6 +243,8 @@ class HotkeyListener:
         # Open one continuous mic stream for the whole session so audio keeps
         # buffering during ASR (no dropped packets between windows).
         self._pipeline.start_capture()
+        spoke_secs = 0.0
+        asr_ms = 0.0
         try:
             while not self._stop_event.is_set():
                 try:
@@ -256,8 +258,16 @@ class HotkeyListener:
                     if streaming:
                         self._key_queue.put(text)  # live-inject into the focused app
                     session_parts.append(text)
+            # How long the user actually spoke. Measured here, before the
+            # transcription work below: a session's duration is the time the
+            # key was held, not the time the machine then spent thinking. The
+            # two used to be conflated, which inflated every session's duration
+            # and quietly halved the reported words-per-minute.
+            spoke_secs = time.time() - session_start
+
             # Flush the final in-progress utterance (no trailing silence yet).
             # For a cloud model this is where the single request happens.
+            asr_start = time.time()
             try:
                 text, _duration = self._pipeline.flush()
                 if text:
@@ -267,9 +277,11 @@ class HotkeyListener:
             except Exception as exc:  # pragma: no cover - runtime guard
                 print(f"[WinWhispr][hotkey] Dictation flush error: {exc}")
                 self._report_transcription_error(exc)
+            asr_ms = (time.time() - asr_start) * 1000
         finally:
             self._pipeline.stop_capture()
-            duration = time.time() - session_start
+            duration = spoke_secs or (time.time() - session_start)
+            wait_start = time.time()
             raw_text = " ".join(p for p in session_parts if p).strip()
             final_text = raw_text
             discarded = self._discard.is_set()
@@ -288,6 +300,16 @@ class HotkeyListener:
             # Restore last: it waits for the injection queue to drain, so it must
             # run after the buffered paste has been queued.
             self._restore_clipboard(saved_clipboard)
+            if raw_text or asr_ms:
+                # The whole wait, split by stage. Without this breakdown "it
+                # feels slow" is unactionable: transcription and cleanup are
+                # different problems with different fixes.
+                waited = (time.time() - wait_start) * 1000
+                print(
+                    f"[WinWhispr][timing] spoke {duration:.1f}s · "
+                    f"asr {asr_ms:.0f}ms · after-release {waited:.0f}ms "
+                    f"({self._pipeline_label()})"
+                )
 
         pending_key = None if discarded else (getattr(self, "_last_commit", None) or {}).get("key")
         if pending_key:
@@ -360,6 +382,12 @@ class HotkeyListener:
         # Local shares the reformatter's warm pipeline, so it costs no extra
         # model load and the two can never generate at the same time.
         return LocalCleanupProvider(self._reformatter)
+
+    def _pipeline_label(self) -> str:
+        """Which engines this session used, for the timing line."""
+        asr = getattr(self._pipeline, "_model_display_name", "?")
+        cleanup = getattr(self._cleanup_provider, "id", "?")
+        return f"asr={asr}, cleanup={cleanup}"
 
     def _report_nothing_heard(self) -> None:
         """Say *why* nothing came out: a dead mic and a missed word differ."""

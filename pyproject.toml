@@ -10,6 +10,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "comtypes>=1.4.0",
+    "faster-whisper>=1.0.0",
     "huggingface_hub>=0.24.0",
     "keyboard>=0.13.5",
     "keyring>=25.0",
