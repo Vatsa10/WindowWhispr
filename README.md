@@ -21,8 +21,9 @@ currently has focus.
   something goes wrong.
 - Microphone capture at 16 kHz, mono, `float32`.
 - Voice-activity chunking with **Silero VAD** (ONNX).
-- **Model-agnostic** speech-to-text running fully in-process via **OpenVINO**
-  (no HTTP). See [Supported models](#supported-models).
+- **Speech-to-text your choice of two ways**: **Groq Whisper large-v3** (default
+  — nothing to download, one request per dictation) or fully local **OpenVINO**
+  models running in-process. See [Supported models](#supported-models).
 - **Automatic cleanup** of the finished transcript by a local LLM: fillers gone,
   spoken self-corrections resolved ("meet at 2, actually 3" → "3"), spoken
   punctuation and lists applied, tone matched to the app you are typing into.
@@ -42,7 +43,8 @@ currently has focus.
 - **Paste / copy the last transcript** again with `Ctrl+Alt+V` / `Ctrl+Alt+C`.
 - Usage analytics in SQLite — words dictated, words per minute (and your best),
   day streak, and time saved versus typing — plus a searchable activity log.
-- **Fully offline** after a one-time model download on first run.
+- **Can run fully offline** — pick the local ASR model and local cleanup, and
+  nothing leaves the machine after the one-time model download.
 - **Reset all data** button in the sidebar to wipe usage metrics and the
   activity log.
 
@@ -81,17 +83,37 @@ under `%USERPROFILE%\.cache\winwhispr`.
 > apps. Run WinWhispr as Administrator if the hotkey is blocked in an elevated app.
 
 
+## Cloud (Groq)
+
+The default speech-to-text model runs on **Groq** — no multi-gigabyte download,
+and `whisper-large-v3` is more accurate than anything that fits comfortably on a
+laptop. You need a free [Groq API key](https://console.groq.com/keys).
+
+Paste it into the **Cloud (Groq)** section of the sidebar. It goes into
+**Windows Credential Manager**, never into `config.json`. For development, the
+`GROQ_API_KEY` environment variable works too.
+
+WinWhispr sends **one request per dictation** — the whole utterance is uploaded
+once when you release the key, rather than one request per pause. The free tier
+allows 20 requests a minute and 2000 a day; turning cleanup on Groq as well
+makes it two requests per dictation.
+
+Prefer to stay offline? Pick `Cohere-transcribe` or `Whisper Large` in the ASR
+Model section and leave cleanup on "This machine" — nothing leaves the
+computer, at the cost of a one-time download.
+
 ## Supported models
 
-All models are pre-optimized **OpenVINO IR** and download on first run (or via
+Local models are pre-optimized **OpenVINO IR** and download on first run (or via
 `WinWhispr.exe setup`) into `%USERPROFILE%\.cache\winwhispr`.
 
 ### Speech-to-text (ASR)
 
-| Display name        | Registry ID                                    | Precision |
-| ------------------- | ---------------------------------------------- | --------- |
-| `Cohere-transcribe` | `Aditya02/cohere-transcribe-03-2026-ov-fp16`   | FP16      |
-| `Whisper Large`     | `OpenVINO/whisper-large-v3-int4-ov`            | INT4      |
+| Display name            | Registry ID                                  | Runs on |
+| ----------------------- | -------------------------------------------- | ------- |
+| `Groq Whisper Large v3` | `whisper-large-v3`                           | Groq (default) |
+| `Cohere-transcribe`     | `Aditya02/cohere-transcribe-03-2026-ov-fp16` | This machine, FP16 |
+| `Whisper Large`         | `OpenVINO/whisper-large-v3-int4-ov`          | This machine, INT4 |
 
 ### Clipboard reformatter (LLM)
 

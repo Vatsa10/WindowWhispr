@@ -50,6 +50,14 @@ Two commit modes:
 - **stream** — each VAD-closed chunk is pasted as you speak, as WinWhispr worked
   before cleanup existed. Cleanup, cancel, and auto-learn are unavailable here.
 
+ASR runs one of two ways. A **local** OpenVINO model transcribes each VAD-closed
+segment as it completes. A **cloud** model (Groq Whisper large-v3, the default)
+batches instead: audio accumulates for the whole session and goes up in a single
+request when you release the key. Per-segment cloud calls would burn the request
+allowance — 20/minute on the free tier — and throw away the context that makes a
+large model worth calling. Sessions longer than the upload limit are split into
+sequential chunks by `core/groq_client.py`.
+
 **Cleanup is an enhancement, never a gate.** A provider error, a timeout, an
 empty result, or any gate rejection all end the same way: the user's raw words
 get pasted. Gate rejections are logged with their reason so the per-level
@@ -89,6 +97,8 @@ WinWhispr/
     hotkey_listener.py      Global hooks · state-machine driver · commit path
     processor.py            AudioCapture · Silero VAD · OpenVINO ASR pipeline
     audio_meter.py          Mic frames → level bars for the pill
+    groq_client.py          Groq Whisper + chat over urllib (no SDK)
+    secrets.py              API keys in Windows Credential Manager
     reformatter.py          OpenVINO GenAI LLM (clipboard reformat + cleanup)
     diagnostics.py          User-facing copy for every failure mode
     stats.py                Usage aggregation (WPM, streak, time saved)
