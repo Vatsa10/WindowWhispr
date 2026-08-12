@@ -39,6 +39,10 @@ DEFAULT_CONFIG = {
     # default: an aggressive default is the top source of "it changed what I
     # said" complaints. "none" pastes the raw transcript with no model call.
     "cleanup_level": "light",
+    # "local" runs the on-device LLM; "groq" sends the transcript to Groq.
+    # The API key itself lives in Windows Credential Manager, never here.
+    "cleanup_provider": "local",
+    "groq_cleanup_model": "llama-3.3-70b-versatile",
     "cleanup_timeout_ms": 4000,
     "per_app_formatting": True,
     # Hold-to-talk, alongside the press-to-toggle hotkey above.

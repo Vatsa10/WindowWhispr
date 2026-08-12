@@ -102,6 +102,8 @@ class HotkeyListener:
         llm_device="CPU",
         commit_mode=DEFAULT_COMMIT_MODE,
         cleanup_level="light",
+        cleanup_provider="local",
+        groq_cleanup_model=None,
         cleanup_timeout_ms=DEFAULT_TIMEOUT_MS,
         per_app_formatting=True,
         dictionary=None,
@@ -142,7 +144,9 @@ class HotkeyListener:
         self._cleanup_level = CleanupLevel.parse(cleanup_level)
         self._cleanup_timeout_ms = int(cleanup_timeout_ms)
         self._per_app_formatting = bool(per_app_formatting)
-        self._cleanup_provider = LocalCleanupProvider(self._reformatter)
+        self._cleanup_provider = self._build_cleanup_provider(
+            cleanup_provider, groq_cleanup_model
+        )
         self._dictionary = dictionary if dictionary is not None else DictionaryStore(
             paths.dictionary_path()
         ).load()
@@ -336,6 +340,17 @@ class HotkeyListener:
         except Exception as exc:  # pragma: no cover - last-resort guard
             print(f"[WinWhispr][cleanup] failed, pasting raw: {exc}")
             return raw_text
+
+    def _build_cleanup_provider(self, choice: str, groq_model: str | None):
+        """Pick the cleanup backend. Unknown values fall back to local."""
+        if str(choice).lower() == "groq":
+            from core.cleanup.provider_groq import GroqCleanupProvider
+            from core.groq_client import DEFAULT_CHAT_MODEL
+
+            return GroqCleanupProvider(groq_model or DEFAULT_CHAT_MODEL)
+        # Local shares the reformatter's warm pipeline, so it costs no extra
+        # model load and the two can never generate at the same time.
+        return LocalCleanupProvider(self._reformatter)
 
     def _report_nothing_heard(self) -> None:
         """Say *why* nothing came out: a dead mic and a missed word differ."""

@@ -49,7 +49,7 @@ from core.model_registry import (
 )
 from core.processor import available_devices, input_devices
 from core.stats import summary
-from core import autostart
+from core import autostart, secrets
 from core import paths
 from core import speaker
 from database import db_manager
@@ -65,7 +65,7 @@ from desktop.widgets import (
 
 _ICON_PNG = str(paths.asset_path("winwhispr.png"))
 
-_PIPELINE_KEYS = {"hotkey", "vad_threshold", "asr_model", "asr_device", "log_transcript", "min_silence_ms", "max_segment_seconds", "reformat_hotkey", "llm_model", "llm_device", "commit_mode", "cleanup_level", "cleanup_timeout_ms", "per_app_formatting", "ptt_enabled", "ptt_key", "cancel_key", "sound_on_start", "input_device", "paste_last_hotkey", "copy_last_hotkey", "autolearn_enabled"}
+_PIPELINE_KEYS = {"hotkey", "vad_threshold", "asr_model", "asr_device", "log_transcript", "min_silence_ms", "max_segment_seconds", "reformat_hotkey", "llm_model", "llm_device", "commit_mode", "cleanup_level", "cleanup_timeout_ms", "per_app_formatting", "cleanup_provider", "groq_cleanup_model", "ptt_enabled", "ptt_key", "cancel_key", "sound_on_start", "input_device", "paste_last_hotkey", "copy_last_hotkey", "autolearn_enabled"}
 
 _log = logging.getLogger("winwhispr.gui")
 
@@ -226,6 +226,7 @@ class MainWindow(QMainWindow):
         self._sidebar_sections = []
         section_specs = [
             ("\u25a0", "ASR Model", True, self._build_model_section),
+            ("\u2601", "Cloud (Groq)", True, self._build_cloud_section),
             ("\u2728", "Cleanup", True, self._build_cleanup_section),
             ("\u2726", "Dictionary", False, self._build_dictionary_section),
             ("\u2328", "Dictation keys", False, self._build_behaviour_section),
@@ -317,6 +318,60 @@ class MainWindow(QMainWindow):
         hint.setWordWrap(True)
         section.add_widget(hint)
 
+    def _build_cloud_section(self, section: CollapsibleSection) -> None:
+        key_label = QLabel("Groq API key")
+        key_label.setProperty("class", "FieldLabel")
+        section.add_widget(key_label)
+
+        self._groq_key_edit = QLineEdit()
+        self._groq_key_edit.setEchoMode(QLineEdit.Password)
+        self._groq_key_edit.setPlaceholderText("gsk_…")
+        self._groq_key_edit.returnPressed.connect(self._save_groq_key)
+        section.add_widget(self._groq_key_edit)
+
+        save_btn = QPushButton("Save key")
+        save_btn.setProperty("class", "Ghost")
+        save_btn.setCursor(Qt.PointingHandCursor)
+        save_btn.clicked.connect(self._save_groq_key)
+        section.add_widget(save_btn)
+
+        self._groq_key_status = QLabel("")
+        self._groq_key_status.setProperty("class", "Hint")
+        self._groq_key_status.setWordWrap(True)
+        section.add_widget(self._groq_key_status)
+        self._refresh_groq_key_status()
+
+        hint = QLabel(
+            "Stored in Windows Credential Manager, never in a settings file. "
+            "Free tier: 20 requests a minute, 2000 a day — WinWhispr sends one "
+            "request per dictation (two if cleanup also runs on Groq)."
+        )
+        hint.setProperty("class", "Hint")
+        hint.setWordWrap(True)
+        section.add_widget(hint)
+
+    def _refresh_groq_key_status(self) -> None:
+        if secrets.has_key("groq_api_key"):
+            self._groq_key_status.setText("Key saved ✓")
+        else:
+            self._groq_key_status.setText(
+                "No key set — cloud models will not run until one is saved."
+            )
+
+    def _save_groq_key(self) -> None:
+        value = self._groq_key_edit.text().strip()
+        if not secrets.set_key("groq_api_key", value):
+            QMessageBox.warning(
+                self,
+                "WinWhispr",
+                "Could not write to Windows Credential Manager. See the log.",
+            )
+            return
+        # Never keep the secret sitting in a widget after it is stored.
+        self._groq_key_edit.clear()
+        self._refresh_groq_key_status()
+        self._rebuild_engine()
+
     _CLEANUP_LEVELS = [
         ("None", "none", "Paste exactly what you said, including mistakes."),
         ("Light (recommended)", "light", "Remove filler words and fix grammar."),
@@ -343,6 +398,24 @@ class MainWindow(QMainWindow):
         self._cleanup_hint.setWordWrap(True)
         section.add_widget(self._cleanup_hint)
         self._update_cleanup_hint()
+
+        run_label = QLabel("Cleanup runs on")
+        run_label.setProperty("class", "FieldLabel")
+        section.add_widget(run_label)
+
+        self._cleanup_provider_combo = QComboBox()
+        self._cleanup_provider_combo.addItems(["This machine", "Groq (cloud)"])
+        self._cleanup_provider_combo.setCurrentIndex(
+            1 if str(self._config.get("cleanup_provider", "local")) == "groq" else 0
+        )
+        self._cleanup_provider_combo.currentIndexChanged.connect(
+            lambda i: self._update_config({"cleanup_provider": "groq" if i else "local"})
+        )
+        self._cleanup_provider_combo.setToolTip(
+            "Groq is far better at self-corrections and much faster than the "
+            "small local model — but the transcript leaves this machine."
+        )
+        section.add_widget(self._cleanup_provider_combo)
 
         self._per_app_check = QCheckBox("Match the app I'm typing into")
         self._per_app_check.setToolTip(
@@ -887,6 +960,8 @@ class MainWindow(QMainWindow):
                     llm_device=self._config["llm_device"],
                     commit_mode=self._config.get("commit_mode", "buffered"),
                     cleanup_level=self._config.get("cleanup_level", "light"),
+                    cleanup_provider=self._config.get("cleanup_provider", "local"),
+                    groq_cleanup_model=self._config.get("groq_cleanup_model"),
                     cleanup_timeout_ms=self._config.get("cleanup_timeout_ms", 4000),
                     per_app_formatting=self._config.get("per_app_formatting", True),
                     dictionary=self._dictionary,

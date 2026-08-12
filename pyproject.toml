@@ -12,6 +12,7 @@ dependencies = [
     "comtypes>=1.4.0",
     "huggingface_hub>=0.24.0",
     "keyboard>=0.13.5",
+    "keyring>=25.0",
     "librosa>=0.10.0",
     "numpy>=1.26.0",
     "onnxruntime>=1.19.0",

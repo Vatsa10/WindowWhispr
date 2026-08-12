@@ -39,6 +39,7 @@ for _pkg in (
     # generates its wrappers at runtime into paths.data_dir(), because the
     # default location inside a frozen bundle is read-only.
     "comtypes",
+    "keyring",
 ):
     try:
         d, b, h = collect_all(_pkg)
@@ -81,6 +82,16 @@ _hiddenimports += [
     "core.cleanup.provider_local",
     "core.autostart",
     "core.commands",
+    "core.groq_client",
+    "core.secrets",
+    "core.cleanup.provider_groq",
+    # keyring finds its backends through entry points, which PyInstaller's
+    # static analysis cannot see; without these the credential store silently
+    # has no backend in the frozen build.
+    "keyring.backends.Windows",
+    "keyring.backends.null",
+    "win32ctypes.core",
+    "win32ctypes.pywin32.win32cred",
     "core.snippets",
     "core.stats",
     "core.dictionary",
