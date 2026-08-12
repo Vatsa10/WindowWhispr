@@ -77,9 +77,12 @@ def _build_auto(log=print):
     hw = probe()
     choice = choose(hw)
     log(f"[WinWhispr][asr] {hw.cpu_threads} threads, "
-        f"{hw.cuda_devices} CUDA device(s), {hw.vram_mb}MB VRAM "
-        f"-> {choice.label}: {choice.reason}")
-    return FasterWhisperEngine(choice, cpu_threads=hw.cpu_threads)
+        f"{hw.cuda_devices} CUDA device(s) (compute {hw.compute_capability:g}), "
+        f"{hw.vram_mb}MB VRAM -> {choice.label}: {choice.reason}")
+    # Automatic choices are checked against the machine at warmup and downgraded
+    # if the guess was optimistic.
+    return FasterWhisperEngine(choice, cpu_threads=hw.cpu_threads,
+                               calibrate_on_warmup=True)
 
 
 def describe_auto_choice() -> str:

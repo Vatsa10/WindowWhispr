@@ -72,6 +72,23 @@ def test_calibrate_downgrades_a_machine_that_is_too_slow():
     assert "over budget" in slower.reason
 
 
+def test_calibrate_tolerates_being_a_little_over():
+    # 323ms measured on a real 24-thread laptop. Swapping accuracy away for
+    # 100ms would be a bad trade, so this must survive calibration.
+    choice = choose(Hardware(cpu_threads=24))
+    assert calibrate(choice, 161.5) == choice
+
+
+def test_calibrate_matches_on_the_model_not_the_whole_choice():
+    # A choice carries a reason string that varies with how it was reached;
+    # comparing whole objects made calibration silently do nothing.
+    gpu_declined = choose(
+        Hardware(cuda_devices=1, vram_mb=8151, compute_capability=12.0, cpu_threads=24)
+    )
+    assert gpu_declined.model == "base.en"
+    assert calibrate(gpu_declined, 400.0).model == "tiny.en"
+
+
 def test_calibrate_stops_at_the_smallest_model():
     tiny = choose(Hardware(cpu_threads=1))
     assert calibrate(tiny, 5000.0) == tiny

@@ -12,7 +12,7 @@ import threading
 
 from core.asr import cuda_runtime
 from core.asr.engine import EngineCaps
-from core.asr.tiering import ModelChoice, cpu_fallback
+from core.asr.tiering import ModelChoice, calibrate, cpu_fallback
 
 _log = logging.getLogger("winwhispr.asr")
 
@@ -20,8 +20,12 @@ _log = logging.getLogger("winwhispr.asr")
 class FasterWhisperEngine:
     """Local speech-to-text. Loads on first use, never on the hook thread."""
 
-    def __init__(self, choice: ModelChoice, cpu_threads: int = 0):
+    def __init__(self, choice: ModelChoice, cpu_threads: int = 0,
+                 calibrate_on_warmup: bool = False):
         self._choice = choice
+        # Only for automatically chosen models. A deliberate choice by the user
+        # is theirs to keep, however slow it turns out to be.
+        self._calibrate = calibrate_on_warmup
         # 0 lets CTranslate2 choose. Capped because past a point extra threads
         # cost more in coordination than they return, and dictation shares the
         # machine with whatever the user is actually doing.
@@ -31,6 +35,8 @@ class FasterWhisperEngine:
         #: Set once a GPU failure has pushed this engine onto the CPU, so the
         #: fallback is attempted exactly once rather than on every utterance.
         self._degraded = False
+        #: What one utterance cost at warmup, in milliseconds. 0 until measured.
+        self.measured_ms = 0.0
         self.caps = EngineCaps(supports_pipelining=True, label=choice.label)
 
     @property
@@ -45,13 +51,46 @@ class FasterWhisperEngine:
         that cost is several seconds. Paying it here, at startup, keeps it out
         of the user's first dictation.
         """
+        import time
+
         import numpy as np
 
         self._ensure_model()
+        probe_seconds = 2.0
+        clip = np.zeros(int(16000 * probe_seconds), dtype=np.float32)
         try:
-            self._transcribe(np.zeros(16000, dtype=np.float32))
+            self._transcribe(clip)          # first call builds kernels
+            started = time.monotonic()
+            self._transcribe(clip)          # second is representative
+            self.measured_ms = (time.monotonic() - started) * 1000
         except Exception as exc:  # pragma: no cover - hardware dependent
             _log.debug("warmup inference failed: %s", exc)
+            return
+
+        if self._calibrate:
+            self._apply_calibration(probe_seconds)
+
+    def _apply_calibration(self, probe_seconds: float) -> None:
+        """Judge the machine on what it did, not on what its spec sheet says.
+
+        Core counts and VRAM are a guess. This is the correction: a throttled
+        GPU, a hot laptop, or a CPU the heuristics did not anticipate all show
+        up here and nowhere else.
+        """
+        per_second = self.measured_ms / probe_seconds
+        better = calibrate(self._choice, per_second)
+        if better == self._choice:
+            _log.info("%s measured %.0fms — keeping it", self._choice.label,
+                      self.measured_ms)
+            return
+        print(f"[WinWhispr][asr] {self._choice.label} measured "
+              f"{self.measured_ms:.0f}ms per utterance here — switching to "
+              f"{better.model}")
+        with self._lock:
+            self._choice = better
+            self.caps = EngineCaps(supports_pipelining=True, label=better.label)
+            self._model = None
+        self._ensure_model()
 
     def _ensure_model(self):
         with self._lock:

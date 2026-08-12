@@ -41,6 +41,12 @@ LATENCY_BUDGET_MS = 300
 #: normally leaves well under this; the cap on segment length bounds it.
 TAIL_SECONDS = 2.0
 
+#: How far over budget a model must land before it is swapped for a smaller
+#: one. Slack is deliberate: another 100ms is barely perceptible, while the
+#: accuracy given up by dropping a model tier is permanent and shows up as
+#: mangled names. Only a model that is clearly too slow gets replaced.
+DOWNGRADE_TOLERANCE = 1.6
+
 
 #: CUDA compute capabilities CTranslate2 ships kernels for. Below the floor the
 #: architecture is too old; above the ceiling it is too new, and CUDA silently
@@ -165,7 +171,7 @@ def calibrate(choice: ModelChoice, measured_ms_per_audio_second: float) -> Model
     nowhere else.
     """
     projected = measured_ms_per_audio_second * TAIL_SECONDS
-    if projected <= LATENCY_BUDGET_MS:
+    if projected <= LATENCY_BUDGET_MS * DOWNGRADE_TOLERANCE:
         return choice
 
     # GPU that cannot keep up: drop to the smaller GPU model rather than to CPU,
@@ -178,10 +184,13 @@ def calibrate(choice: ModelChoice, measured_ms_per_audio_second: float) -> Model
             )
         return choice
 
-    try:
-        index = _FALLBACK_ORDER.index(choice)
-    except ValueError:
+    # Matched on the model, not the whole choice: a choice carries a `reason`
+    # string that varies with how it was arrived at, and comparing those would
+    # silently never match.
+    order = [c.model for c in _FALLBACK_ORDER]
+    if choice.model not in order:
         return choice
+    index = order.index(choice.model)
     if index + 1 >= len(_FALLBACK_ORDER):
         return choice  # already the smallest; nothing left to give up
     return replace(
