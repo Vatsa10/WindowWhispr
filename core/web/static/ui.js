@@ -9,6 +9,7 @@
 // pause is a continuation, not a correction of the first one.
 
 import { api, createListener, webSpeechAvailable } from "/static/app.js";
+import { createWaveform } from "/static/waveform.js";
 
 // --- DOM lookups, once ------------------------------------------------
 
@@ -31,12 +32,9 @@ const COPY_LABEL = copyLabel.textContent;
 const STATUS_CLEAR_MS = 4000;
 const COPY_RESET_MS = 2000;
 
-// Seam for Task 3: `createWaveform(canvas)` from waveform.js will be attached
-// here and its returned `onLevel`-style callback wired into runTake(). Until
-// then the level callback is a no-op so nothing touches the DOM.
-let waveformRenderer = null; // set by Task 3, e.g. waveformRenderer = createWaveform(waveform);
+let waveformRenderer = createWaveform(waveform);
 function onLevel(level) {
-  waveformRenderer?.onLevel?.(level);
+  waveformRenderer?.setLevel?.(level);
 }
 
 let listener = null;
@@ -141,6 +139,7 @@ async function runTake() {
   listener = createListener();
   setTalkState(true);
   talkLabel.textContent = "Listening...";
+  waveformRenderer?.start?.();
 
   const result = await listener.listen({
     onLevel,
@@ -198,6 +197,7 @@ async function runSession() {
     setTalkBusy(false);
     talkLabel.textContent = "Tap to talk";
     onLevel(0);
+    waveformRenderer?.stop?.();
   }
 }
 
