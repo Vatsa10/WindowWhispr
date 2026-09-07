@@ -17,5 +17,6 @@ build/
 dist/
 packaging/installer/Output/
 
-# Reference implementation we ported logic from; kept locally, not shipped.
+# Reference implementations we ported logic from; kept locally, not shipped.
 WhimprFlow/
+horseflow/
