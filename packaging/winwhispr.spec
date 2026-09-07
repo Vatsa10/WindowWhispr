@@ -100,6 +100,8 @@ _hiddenimports += [
     "core.web.languages",
     "core.web.pill_host",
     "core.web.session",
+    "core.web.app_api",
+    "desktop.tray",
     "webview",
     "core.web.paste",
     "core.model_store",

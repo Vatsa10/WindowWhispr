@@ -40,6 +40,22 @@ from core.web.bridge import KEEPALIVE_SECONDS, Bridge, format_event
 _log = logging.getLogger("winwhispr.web")
 
 DEFAULT_PORT = 8788
+
+#: What the app window may ask for: request name -> (method, takes a payload).
+#: A closed list, in one place, because this route is the whole settings screen.
+APP_OPS = {
+    "config": ("config", False),
+    "save_config": ("save_config", True),
+    "choices": ("choices", False),
+    "stats": ("stats", False),
+    "notes": ("notes", True),
+    "reset": ("reset", False),
+    "dictionary": ("dictionary", False),
+    "dictionary_add": ("dictionary_add", True),
+    "dictionary_remove": ("dictionary_remove", True),
+    "models": ("models", False),
+    "model_remove": ("model_remove", True),
+}
 STATIC_DIR = Path(__file__).parent / "static"
 
 #: Refuse audio larger than this. The page sends one utterance at a time; a
@@ -81,6 +97,8 @@ class WebServer:
         self.allow_paste = bool(allow_paste)
         #: Present only in hotkey mode, where a browser tab is the recognizer.
         self.bridge = bridge
+        #: The app window's data surface, when there is an app window.
+        self.app_api = None
         #: Called when the pill asks for the main window. Set by its owner.
         self.on_show_app = None
         #: Called with each finished transcript, for the activity log and
@@ -162,13 +180,36 @@ class WebServer:
             self.on_transcript(text)
         return {"text": text, "pasted": pasted}
 
+    def app(self, payload: dict) -> dict:
+        """One route for the whole settings screen.
+
+        A verb in the body rather than a path each: the surface is a closed
+        list either way, and one place to read it is worth more than tidy URLs
+        on a server only this app talks to.
+        """
+        if self.app_api is None:
+            return {"error": "the app window is not available"}
+        op = (payload.get("op") or "").strip()
+        body = payload.get("payload") or {}
+        handler = APP_OPS.get(op)
+        if handler is None:
+            return {"error": f"unknown request {op!r}"}
+        method = getattr(self.app_api, handler[0])
+        try:
+            return method(body) if handler[1] else method()
+        except Exception as exc:  # a settings screen must not take the app down
+            _log.warning("app request %r failed: %s", op, exc, exc_info=True)
+            return {"error": str(exc)}
+
     def show_app(self) -> dict:
         """Bring the desktop window up. The pill is the only way to reach it
         once the window is closed to the tray."""
-        if self.on_show_app is None:
-            return {"shown": False}
-        self.on_show_app()
-        return {"shown": True}
+        if self.on_show_app is not None:
+            self.on_show_app()
+        # The windows live in the recognizer process, so opening one is a
+        # message to it rather than something this process can do.
+        told = self.bridge.send({"open_app": True}) if self.bridge else 0
+        return {"shown": bool(told or self.on_show_app)}
 
     def build(self, host: str = "127.0.0.1", port: int = DEFAULT_PORT):
         handler = _make_handler(self)
@@ -260,6 +301,8 @@ def _make_handler(server: WebServer):
                 return self._send_static("index.html")
             if path in ("/listen", "/listen.html"):
                 return self._send_static("listen.html")
+            if path in ("/app", "/app/"):
+                return self._send_static("app/index.html")
             if path.startswith("/static/"):
                 return self._send_static(path[len("/static/"):])
             self._send_json({"error": "not found"}, 404)
@@ -281,6 +324,8 @@ def _make_handler(server: WebServer):
                 return self._send_json(server.stt(payload))
             if path == "/api/tidy":
                 return self._send_json(server.tidy(payload))
+            if path == "/api/app":
+                return self._send_json(server.app(payload))
             if path == "/api/show":
                 return self._send_json(server.show_app())
             if path == "/api/final":

@@ -62,6 +62,18 @@ class Bridge:
         with self._lock:
             self._subscribers.discard(events)
 
+    def send(self, payload: dict) -> int:
+        """Push an event to every tab. Returns how many were told.
+
+        The hotkey is not the only thing the app has to say to a window it
+        does not own -- "open the settings screen" travels the same way.
+        """
+        with self._lock:
+            targets = list(self._subscribers)
+        for events in targets:
+            events.put(dict(payload))
+        return len(targets)
+
     def set_listening(self, listening: bool) -> bool:
         """Tell every tab to start or stop. Returns True if this changed it.
 

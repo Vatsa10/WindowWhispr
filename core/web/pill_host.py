@@ -28,6 +28,12 @@ SIZES = {
     "menu": (200, 84),
 }
 
+#: The settings window. A minimum rather than a fixed size: the layout is a
+#: grid that reflows, and this is only the point below which text would clip.
+APP_WIDTH = 1060
+APP_HEIGHT = 720
+APP_MIN_SIZE = (420, 380)
+
 #: Clear of the taskbar, which the screen geometry pywebview reports includes.
 BOTTOM_MARGIN = 64
 
@@ -56,6 +62,7 @@ class Api:
         # object to JavaScript and walks what it finds, and walking a Window
         # recurses through its native widget tree until the stack gives out.
         self._window = None
+        self._app = None
         self._screen = (1920, 1080)
         self._size = ""
 
@@ -72,6 +79,37 @@ class Api:
         x, y = place(*self._screen, size=size)
         self._window.resize(width, height)
         self._window.move(x, y)
+
+    def open_app(self, url: str) -> None:
+        """Open the settings window, or raise the one already open.
+
+        Both windows live here because pywebview drives one event loop per
+        process; a second process would be a second loop and a second WebView2
+        runtime for no gain.
+        """
+        import webview
+
+        if self._app is not None:
+            try:
+                self._app.restore()
+                return
+            except Exception:
+                self._app = None  # it was closed; fall through and rebuild
+
+        window = webview.create_window(
+            "WinWhispr",
+            url,
+            width=APP_WIDTH,
+            height=APP_HEIGHT,
+            min_size=APP_MIN_SIZE,
+            background_color="#0A0C12",
+        )
+        self._app = window
+
+        def forget():
+            self._app = None
+
+        window.events.closed += forget
 
     def quit(self) -> None:
         if self._window is not None:

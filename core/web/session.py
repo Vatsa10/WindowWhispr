@@ -40,6 +40,8 @@ class BrowserDictation:
         self._on_show_app = on_show_app
         self._key = key
         self._port = port
+        #: The settings screen's data surface. Assign before ``start()``.
+        self.app_api = None
         self._server = None
         self._child = None
         self._started_at = 0.0
@@ -54,13 +56,18 @@ class BrowserDictation:
         self._server = build_hotkey_services(allow_paste=True)
         self._server.on_transcript = self._record
         self._server.on_show_app = self._on_show_app
+        self._server.app_api = self.app_api
 
         bound = self._bind()
         self.url = f"http://127.0.0.1:{bound}/listen"
 
-        from core.web.server import _hook_hotkey
+        # An empty key means "serve the windows, hook nothing" -- the local
+        # engine owns the hotkey then, and a second hook on it would dictate
+        # twice.
+        if self._key:
+            from core.web.server import _hook_hotkey
 
-        _hook_hotkey(self._server.bridge, self._key, on_change=self._on_key)
+            _hook_hotkey(self._server.bridge, self._key, on_change=self._on_key)
         self._child = spawn_pill(self.url)
         _log.info("browser dictation on %s, key=%s", self.url, self._key)
 
@@ -88,6 +95,12 @@ class BrowserDictation:
             self._on_transcript(text, len(text.split()), spoke)
         except Exception as exc:  # a logging failure must not lose dictation
             _log.warning("could not record a transcript: %s", exc)
+
+    def show_app(self) -> bool:
+        """Ask the window host to open the settings screen."""
+        if self._server is None:
+            return False
+        return bool(self._server.show_app().get("shown"))
 
     def stop(self) -> None:
         """Close the window and the server. Safe to call twice."""

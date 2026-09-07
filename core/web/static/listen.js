@@ -179,7 +179,11 @@ function listen() {
   const stream = new EventSource(url);
 
   stream.onmessage = (event) => {
-    const next = !!JSON.parse(event.data).listening;
+    const message = JSON.parse(event.data);
+    // The tray asks for the settings window through here, because the windows
+    // live in this process rather than the one with the tray icon.
+    if (message.open_app) return openApp();
+    const next = !!message.listening;
     if (next === want) return;
     want = next;
     if (want) {
@@ -225,9 +229,12 @@ arm.addEventListener("click", async () => {
 // Double-click opens the app. The pill is the only handle on it once the
 // window has been closed to the tray, so this is not a shortcut, it is the way
 // back in.
+function openApp() {
+  window.pywebview?.api?.open_app(location.origin + "/app");
+}
+
 document.addEventListener("dblclick", () => {
-  if (!arm.hidden) return;
-  post("/api/show", {}).catch(() => {});
+  if (arm.hidden) openApp();
 });
 
 // Right-click is the only affordance a pill this small has room for. It grows

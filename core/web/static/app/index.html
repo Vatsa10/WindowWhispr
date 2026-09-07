@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WinWhispr</title>
+<link rel="stylesheet" href="/static/app/style.css">
+</head>
+<body>
+<div class="shell">
+  <div class="brand">
+    <span class="mark" aria-hidden="true"></span>
+    <div>
+      <h1>WinWhispr</h1>
+      <p id="brand-sub">Hold Right Ctrl and speak</p>
+    </div>
+  </div>
+
+  <div class="topbar">
+    <span class="chip"><span class="dot" id="status-dot"></span><span id="status-text">Starting…</span></span>
+  </div>
+
+  <nav class="sidebar" id="sidebar" aria-label="Sections"></nav>
+  <nav class="tabs" id="tabs" aria-label="Sections"></nav>
+
+  <main>
+    <!-- Dictation -------------------------------------------------------->
+    <section class="view active" id="view-dictation">
+      <h2>Dictation</h2>
+      <p class="lede">Hold your talk key in any application, speak, and let go.
+        The words are cleaned up and typed where your cursor already was.</p>
+
+      <div class="card">
+        <h3>Speech engine</h3>
+        <p class="hint">The browser engine is ready the moment WinWhispr is
+          installed and sends audio to Microsoft's speech service. The local
+          model keeps everything on this machine, after a one-time download.</p>
+        <div class="fields">
+          <label class="field">
+            <span>Engine</span>
+            <select id="speech_engine">
+              <option value="browser">Browser — instant, nothing to download</option>
+              <option value="local">This machine — fully offline</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Language <span class="note">browser engine only</span></span>
+            <select id="speech_language"></select>
+          </label>
+        </div>
+      </div>
+
+      <div class="card" id="local-model-card">
+        <h3>Local model</h3>
+        <p class="hint">Automatic sizes the model to this machine, then measures
+          it and drops to a smaller one if it turns out too slow.</p>
+        <div class="fields">
+          <label class="field"><span>Model</span><select id="asr_model"></select></label>
+          <label class="field"><span>Compute device</span><select id="asr_device"></select></label>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Keys</h3>
+        <div class="fields">
+          <label class="field">
+            <span>Talk key <span class="note">hold to dictate</span></span>
+            <input type="text" id="ptt_key" spellcheck="false">
+          </label>
+          <label class="field">
+            <span>Cancel key <span class="note">throws the recording away</span></span>
+            <input type="text" id="cancel_key" spellcheck="false">
+          </label>
+        </div>
+        <div class="row" style="margin-top:14px">
+          <label class="check"><input type="checkbox" id="hands_free_double_tap"><span>Tap twice to keep recording</span></label>
+          <label class="check"><input type="checkbox" id="sound_on_start"><span>Sound when recording starts</span></label>
+        </div>
+      </div>
+    </section>
+
+    <!-- Cleanup ---------------------------------------------------------->
+    <section class="view" id="view-cleanup">
+      <h2>Cleanup</h2>
+      <p class="lede">Fillers removed, spoken punctuation applied, sentences
+        capitalized. If cleanup ever looks like it changed what you said, your
+        raw words are pasted instead — it can only improve the text.</p>
+
+      <div class="card">
+        <h3>How much to change</h3>
+        <div class="fields">
+          <label class="field">
+            <span>Level</span>
+            <select id="cleanup_level">
+              <option value="none">None — paste exactly what was heard</option>
+              <option value="light">Light — fillers and punctuation only</option>
+              <option value="medium">Medium — also tighten wording</option>
+              <option value="high">High — rewrite for brevity</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Timeout <span class="note">milliseconds</span></span>
+            <input type="number" id="cleanup_timeout_ms" min="500" max="20000" step="100">
+          </label>
+        </div>
+        <div class="row" style="margin-top:14px">
+          <label class="check"><input type="checkbox" id="per_app_formatting"><span>Match the tone of the app I am typing into</span></label>
+        </div>
+      </div>
+    </section>
+
+    <!-- Dictionary ------------------------------------------------------->
+    <section class="view" id="view-dictionary">
+      <h2>Dictionary</h2>
+      <p class="lede">Names and terms recognition keeps missing. They are given
+        to the recognizer as a spelling authority, not swapped in afterwards,
+        so they cannot corrupt a word that merely sounds similar.</p>
+
+      <div class="card">
+        <h3>Add a spelling</h3>
+        <div class="fields">
+          <label class="field"><span>Correct spelling</span><input type="text" id="dict-correct" placeholder="ChargeBee"></label>
+          <label class="field"><span>What it hears <span class="note">comma separated</span></span><input type="text" id="dict-mishears" placeholder="charge bee, charge b"></label>
+        </div>
+        <div class="row" style="margin-top:14px">
+          <button class="primary" id="dict-add">Add</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Known words</h3>
+        <div class="scroller"><table id="dict-table"><tbody></tbody></table></div>
+      </div>
+    </section>
+
+    <!-- Activity --------------------------------------------------------->
+    <section class="view" id="view-activity">
+      <h2>Activity</h2>
+      <p class="lede">Everything dictated on this machine. It never leaves it.</p>
+
+      <div class="metrics" id="metrics"></div>
+
+      <div class="card">
+        <h3>Last seven days</h3>
+        <div class="spark" id="spark"></div>
+      </div>
+
+      <div class="loghead">
+        <input type="search" id="log-search" placeholder="Search transcripts">
+        <button class="small" id="log-refresh">Refresh</button>
+      </div>
+      <div id="log"></div>
+    </section>
+
+    <!-- Storage ---------------------------------------------------------->
+    <section class="view" id="view-storage">
+      <h2>Storage</h2>
+      <p class="lede">Models downloaded to this machine. Deleting one frees the
+        space; it downloads again if you pick it later.</p>
+
+      <div class="card">
+        <div class="scroller"><table id="models-table">
+          <thead><tr><th>Model</th><th class="num">Size</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table></div>
+      </div>
+
+      <div class="card">
+        <h3>Start with Windows</h3>
+        <div class="fields">
+          <label class="field">
+            <span>At login, start</span>
+            <select id="startup_mode">
+              <option value="app">The app</option>
+              <option value="listen">Browser dictation only</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Reset</h3>
+        <p class="hint">Erases usage metrics and the activity log. Settings, the
+          dictionary and downloaded models are left alone.</p>
+        <button class="danger" id="reset">Erase metrics and log</button>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+<script type="module" src="/static/app/app.js"></script>
+</body>
+</html>
