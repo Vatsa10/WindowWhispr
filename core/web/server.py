@@ -474,13 +474,13 @@ def serve_hotkey(host: str = "127.0.0.1", port: int = DEFAULT_PORT,
         httpd.server_close()
         return
 
-    print(f"[WinWhispr][web] language: {web.language}")
-    print(f"[WinWhispr][web] hold {key} in any app and speak.")
+    print(f"[WinWhispr][web] language: {web.language}", flush=True)
+    print(f"[WinWhispr][web] hold {key} in any app and speak.", flush=True)
     child = None
     if window:
         child = spawn_pill(url)
     else:
-        print(f"[WinWhispr][web] open {url}")
+        print(f"[WinWhispr][web] open {url}", flush=True)
 
     try:
         httpd.serve_forever()
