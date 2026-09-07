@@ -609,12 +609,33 @@ class MainWindow(QMainWindow):
         self._autostart_check.toggled.connect(self._on_autostart_toggled)
         section.add_widget(self._autostart_check)
 
+        self._startup_combo = QComboBox()
+        self._startup_combo.addItem("Start the app (local speech model)", "app")
+        self._startup_combo.addItem("Start browser dictation (no model to load)", "listen")
+        startup = "listen" if self._config.get("startup_mode") == "listen" else "app"
+        self._startup_combo.setCurrentIndex(self._startup_combo.findData(startup))
+        self._startup_combo.setEnabled(self._autostart_check.isChecked())
+        self._startup_combo.currentIndexChanged.connect(self._on_startup_mode_changed)
+        section.add_widget(self._startup_combo)
+
     def _on_toggle_enabled(self, on: bool) -> None:
         self._hotkey_edit.setEnabled(bool(on))
         self._update_config({"toggle_enabled": bool(on)})
 
+    def _startup_mode(self) -> str:
+        """The registry argument for the configured startup mode."""
+        return "listen" if self._config.get("startup_mode") == "listen" else ""
+
+    def _on_startup_mode_changed(self, index: int) -> None:
+        self._update_config({"startup_mode": self._startup_combo.itemData(index)})
+        # Rewrite the registry value so the choice takes effect now rather
+        # than the next time autostart is toggled.
+        if self._autostart_check.isChecked():
+            autostart.set_enabled(True, self._startup_mode())
+
     def _on_autostart_toggled(self, on: bool) -> None:
-        if not autostart.set_enabled(bool(on)):
+        self._startup_combo.setEnabled(bool(on))
+        if not autostart.set_enabled(bool(on), self._startup_mode()):
             QMessageBox.warning(
                 self,
                 "WinWhispr",

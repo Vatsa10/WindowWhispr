@@ -71,6 +71,8 @@ DEFAULT_CONFIG = {
     # The browser recognizer's language. Set once in settings and then left
     # alone; "auto" follows the operating system.
     "speech_language": "auto",
+    # What "start at login" launches: the desktop app, or browser dictation.
+    "startup_mode": "app",
     "sound_on_start": True,
     # Reuse the last transcript without dictating it again.
     "paste_last_hotkey": "ctrl+alt+v",

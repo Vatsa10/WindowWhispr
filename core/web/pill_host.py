@@ -25,6 +25,7 @@ SIZES = {
     "idle": (128, 30),
     "live": (340, 62),
     "arm": (260, 44),
+    "menu": (200, 84),
 }
 
 #: Clear of the taskbar, which the screen geometry pywebview reports includes.

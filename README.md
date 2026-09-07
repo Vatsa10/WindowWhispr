@@ -69,9 +69,18 @@ of the screen. Approve the microphone once, on the pill, and it is remembered.
 Set the language once in **Dictation language** in the sidebar; it is picked up
 without a restart.
 
-> The pill stays on screen on purpose. Chromium freezes the renderer of a
-> window that is hidden or off-screen, and a frozen renderer hears nothing —
-> measured: neither produced so much as an `onstart`.
+The pill is a lozenge the width of a word while it waits, grows while you
+speak, and shrinks again once the words have been typed. Right-click it to
+quit; drag it anywhere you prefer.
+
+> It stays on screen on purpose. Chromium freezes the renderer of a window
+> that is hidden or off-screen, and a frozen renderer hears nothing —
+> measured: neither produced so much as an `onstart`. Small is the answer;
+> hidden is not available.
+
+To have it running whenever you are, tick **Start WinWhispr with Windows** in
+the sidebar and set the dropdown under it to **Start browser dictation**. It
+stays up until you quit it from the pill.
 
 Two things to know before choosing this over the local model: the audio goes to
 Microsoft's speech service, so this mode is not offline; and it needs the
