@@ -50,6 +50,7 @@
     user-select: none; cursor: default;
   }
 
+  #root { height: 100%; }
   .pill {
     position: absolute; inset: 0 4px 4px 0;
     display: flex; align-items: center; gap: 10px;
@@ -102,31 +103,22 @@
     transition: transform 120ms cubic-bezier(.2,.8,.3,1), box-shadow 120ms cubic-bezier(.2,.8,.3,1);
   }
   button:active { transform: translate(2px, 2px); box-shadow: none; }
-  #arm {
+  .overlay.arm {
     position: absolute; inset: 0; width: 100%; height: 100%;
     border: 0; background: transparent; box-shadow: none;
   }
-  #arm:active { transform: none; }
-  #menu { flex-direction: column; padding: 10px; background: var(--paper); }
-  #menu button { width: 100%; }
-  #quit { background: var(--red); color: #fff; }
+  .overlay.arm:active { transform: none; }
+  .overlay.menu { flex-direction: column; padding: 10px; background: var(--paper); }
+  .overlay.menu button { width: 100%; }
+  .overlay .quit { background: var(--red); color: #fff; }
 </style>
 </head>
 <body class="size-arm">
-<div class="pill">
-  <span class="dot" id="dot"></span>
-  <div class="lines">
-    <div class="state" id="state">Starting…</div>
-    <div class="detail" id="detail" role="status" aria-live="polite"></div>
-  </div>
-</div>
-
-<div class="overlay" id="menu" hidden>
-  <button id="quit" type="button">Quit WinWhispr</button>
-  <button id="dismiss" type="button">Keep running</button>
-</div>
-
-<button class="overlay" id="arm" type="button">Tap to enable the microphone</button>
-<script type="module" src="/static/listen.js"></script>
+<div id="root"></div>
+<!-- Vendored, and UMD, so they must load before the module that wraps them. -->
+<script src="/static/vendor/react.js"></script>
+<script src="/static/vendor/react-dom.js"></script>
+<script src="/static/vendor/htm.js"></script>
+<script type="module" src="/static/pill.js"></script>
 </body>
 </html>

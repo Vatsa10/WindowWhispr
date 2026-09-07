@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0f172a;color:#f8fafc}
+a{color:#22c55e}a:hover{color:#4ade80}
+select option{background:#16203a;color:#f8fafc}
+@keyframes ww-wave{from{transform:scaleY(.35)}to{transform:scaleY(1.5)}}
+@keyframes ww-pulse{0%,100%{opacity:1}50%{opacity:.3}}
+@keyframes ww-skel{0%,100%{opacity:1}50%{opacity:.5}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-thumb{background:#2e3c56;border-radius:8px}
+</style>
+</helmet>
+<div style="min-height:100vh;background:#0f172a;color:#f8fafc;font-family:Inter,system-ui,sans-serif;font-size:13px;line-height:1.45;-webkit-font-smoothing:antialiased">
+
+<div style="position:sticky;top:0;z-index:5;display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;padding:8px 16px;background:#0f172a;border-bottom:1px solid #2e3c56">
+  <div style="display:flex;align-items:center;gap:10px;margin-right:auto"><span style="width:8px;height:8px;border-radius:99px;background:#22c55e"></span><span style="font-weight:600">WinWhispr</span><span style="color:#64748b">prototype</span></div>
+  <div role="tablist" style="display:flex;gap:4px;padding:2px;background:#16203a;border:1px solid #2e3c56;border-radius:10px">
+    <sc-for list="{{ screens }}" as="sc" hint-placeholder-count="4">
+      <button role="tab" onClick="{{ sc.go }}" style="height:36px;padding:0 14px;border:0;border-radius:8px;background:{{ sc.bg }};color:{{ sc.color }};font-weight:{{ sc.weight }};font-family:inherit;font-size:13px;cursor:pointer;transition:background 160ms ease-out" style-focus="outline:2px solid #22c55e;outline-offset:2px">{{ sc.label }}</button>
+    </sc-for>
+  </div>
+  <sc-if value="{{ isMain }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;align-items:center;gap:8px"><span style="color:#64748b">Window width</span>
+      <div style="display:flex;gap:4px;padding:2px;background:#16203a;border:1px solid #2e3c56;border-radius:10px">
+        <sc-for list="{{ widths }}" as="w" hint-placeholder-count="3">
+          <button onClick="{{ w.go }}" style="height:36px;padding:0 12px;border:0;border-radius:8px;background:{{ w.bg }};color:{{ w.color }};font-family:'JetBrains Mono',monospace;font-size:12px;cursor:pointer" style-focus="outline:2px solid #22c55e;outline-offset:2px">{{ w.label }}</button>
+        </sc-for>
+      </div>
+    </div>
+  </sc-if>
+</div>
+
+<!-- ============ PILL ============ -->
+<sc-if value="{{ isPill }}" hint-placeholder-val="{{ true }}">
+<div data-screen-label="Pill" style="max-width:1100px;margin:0 auto;padding:32px 24px 64px;display:flex;flex-direction:column;gap:24px">
+  <div><h1 style="margin:0;font-size:20px;font-weight:600">The pill</h1><p style="margin:6px 0 0;color:#94a3b8;max-width:640px;text-wrap:pretty">The app's only permanent surface. It sits above the taskbar, always on top. Idle it is 128×30. While you speak it grows to 340×62. Double-click opens the main window; right-click for the menu.</p></div>
+
+  <div style="background:linear-gradient(180deg,#0b1222,#121b31);border:1px solid #2e3c56;border-radius:12px;overflow:hidden">
+    <div style="display:flex;flex-wrap:wrap;gap:40px 36px;align-items:flex-end;justify-content:center;padding:48px 24px 20px">
+
+      <div style="display:flex;flex-direction:column;align-items:center;gap:14px">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#64748b">Not armed</span>
+        <button onClick="{{ armDemo }}" title="Tap to enable the microphone" style="height:30px;padding:0 12px 0 10px;display:flex;align-items:center;gap:8px;background:#16203a;border:1px solid #2e3c56;border-radius:99px;color:#94a3b8;font-family:inherit;font-size:13px;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,.4);transition:transform 180ms ease-out" style-hover="color:#f8fafc" style-focus="outline:2px solid #22c55e;outline-offset:2px">{{ icons.micOff }}<span>Tap to enable the microphone</span></button>
+      </div>
+
+      <div style="display:flex;flex-direction:column;align-items:center;gap:14px;position:relative">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#64748b">Ready · right-click menu</span>
+        <div style="position:relative">
+          <div onDoubleClick="{{ goMain }}" onContextMenu="{{ toggleCtx }}" style="width:128px;height:30px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;gap:8px;background:#16203a;border:1px solid #2e3c56;border-radius:99px;box-shadow:0 8px 24px rgba(0,0,0,.4);cursor:default;user-select:none"><span style="width:8px;height:8px;border-radius:99px;background:#22c55e"></span><span>Ready</span></div>
+          <sc-if value="{{ ctxOpen }}" hint-placeholder-val="{{ true }}">
+            <div role="menu" style="position:absolute;left:100%;bottom:0;margin-left:12px;width:168px;padding:4px;background:#1e293b;border:1px solid #2e3c56;border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,.5);display:flex;flex-direction:column;gap:2px;z-index:2">
+              <button role="menuitem" onClick="{{ toggleCtx }}" style="height:40px;display:flex;align-items:center;justify-content:space-between;padding:0 10px;border:0;border-radius:6px;background:transparent;color:#f8fafc;font-family:inherit;font-size:13px;cursor:pointer;text-align:left" style-hover="background:#273449" style-focus="outline:2px solid #22c55e;outline-offset:-2px"><span>Keep running</span>{{ icons.checkSm }}</button>
+              <button role="menuitem" onClick="{{ toggleCtx }}" style="height:40px;display:flex;align-items:center;padding:0 10px;border:0;border-radius:6px;background:transparent;color:#f8fafc;font-family:inherit;font-size:13px;cursor:pointer;text-align:left" style-hover="background:#273449" style-focus="outline:2px solid #22c55e;outline-offset:-2px">Quit</button>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;align-items:center;gap:14px">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#64748b">Listening</span>
+        <div style="width:340px;max-width:100%;height:62px;box-sizing:border-box;display:flex;align-items:center;gap:12px;padding:0 18px 0 14px;background:#16203a;border:1px solid #22c55e;border-radius:99px;box-shadow:0 8px 24px rgba(0,0,0,.4),0 0 0 4px rgba(34,197,94,.12)">{{ wave }}<span style="flex:1;min-width:0;font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.4;color:#f8fafc;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">so we should move the meeting to thursday no wait fri</span></div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;align-items:center;gap:14px">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#64748b">Typing…</span>
+        <div style="width:128px;height:30px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;gap:8px;background:#16203a;border:1px solid #2e3c56;border-radius:99px;box-shadow:0 8px 24px rgba(0,0,0,.4)">{{ pulseDot }}<span>Typing…</span></div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;align-items:center;gap:14px">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#64748b">Error</span>
+        <button style="height:30px;padding:0 12px;display:flex;align-items:center;gap:8px;background:#16203a;border:1px solid #2e3c56;border-radius:99px;color:#f8fafc;font-family:inherit;font-size:13px;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,.4)" style-focus="outline:2px solid #22c55e;outline-offset:2px"><span style="width:8px;height:8px;border-radius:99px;background:#ef4444"></span><span>No microphone</span><span style="color:#94a3b8">·</span><span style="color:#94a3b8">Retry</span></button>
+      </div>
+    </div>
+    <div style="height:40px;background:#0a0f1c;border-top:1px solid #2e3c56;display:flex;align-items:center;justify-content:flex-end;gap:16px;padding:0 16px;color:#64748b">{{ icons.globeSm }}{{ icons.micSm }}<span style="font-family:'JetBrains Mono',monospace;font-size:12px">14:32</span></div>
+  </div>
+
+  <div style="background:#16203a;border:1px solid #2e3c56;border-radius:12px;padding:20px;display:flex;flex-wrap:wrap;gap:24px;align-items:center;justify-content:space-between">
+    <div style="min-width:220px;flex:1"><h2 style="margin:0;font-size:15px;font-weight:600">Try it</h2><p style="margin:4px 0 0;color:#94a3b8">Hold <kbd style="font-family:'JetBrains Mono',monospace;font-size:12px;padding:2px 6px;background:#0f172a;border:1px solid #2e3c56;border-radius:6px">Space</kbd> (standing in for Right Ctrl) or press and hold the pill. Release to type.</p>
+      <p style="margin:12px 0 0;min-height:40px;padding:10px 12px;background:#0f172a;border:1px solid #2e3c56;border-radius:8px;color:{{ typedColor }}">{{ typedOrHint }}</p></div>
+    <div style="display:flex;justify-content:center;min-width:240px">
+      <sc-if value="{{ demoReady }}" hint-placeholder-val="{{ true }}">
+        <button onMouseDown="{{ startDemo }}" onMouseUp="{{ stopDemo }}" onMouseLeave="{{ stopDemo }}" onTouchStart="{{ startDemo }}" onTouchEnd="{{ stopDemo }}" style="width:128px;height:30px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;gap:8px;background:#16203a;border:1px solid #2e3c56;border-radius:99px;color:#f8fafc;font-family:inherit;font-size:13px;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,.4);user-select:none" style-focus="outline:2px solid #22c55e;outline-offset:2px"><span style="width:8px;height:8px;border-radius:99px;background:#22c55e"></span><span>Ready</span></button>
+      </sc-if>
+      <sc-if value="{{ demoListening }}" hint-placeholder-val="{{ false }}">
+        <div onMouseUp="{{ stopDemo }}" onMouseLeave="{{ stopDemo }}" onTouchEnd="{{ stopDemo }}" style="width:340px;max-width:100%;height:62px;box-sizing:border-box;display:flex;align-items:center;gap:12px;padding:0 18px 0 14px;background:#16203a;border:1px solid #22c55e;border-radius:99px;box-shadow:0 8px 24px rgba(0,0,0,.4),0 0 0 4px rgba(34,197,94,.12);user-select:none">{{ wave }}<span style="flex:1;min-width:0;font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">{{ demoText }}</span></div>
+      </sc-if>
+      <sc-if value="{{ demoTyping }}" hint-placeholder-val="{{ false }}">
+        <div style="width:128px;height:30px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;gap:8px;background:#16203a;border:1px solid #2e3c56;border-radius:99px;box-shadow:0 8px 24px rgba(0,0,0,.4)">{{ pulseDot }}<span>Typing…</span></div>
+      </sc-if>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<!-- ============ FIRST RUN ============ -->
+<sc-if value="{{ isFirstRun }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="First run" style="max-width:560px;margin:0 auto;padding:48px 16px 64px">
+  <div style="background:#16203a;border:1px solid #2e3c56;border-radius:16px;padding:28px;display:flex;flex-direction:column;gap:24px">
+    <div style="display:flex;gap:8px;align-items:center">
+      <sc-for list="{{ frSteps }}" as="st" hint-placeholder-count="3">
+        <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0"><span style="width:24px;height:24px;flex:none;border-radius:99px;display:flex;align-items:center;justify-content:center;background:{{ st.bg }};color:{{ st.fg }};border:1px solid {{ st.border }};font-family:'JetBrains Mono',monospace;font-size:12px">{{ st.n }}</span><span style="color:{{ st.color }};font-weight:{{ st.weight }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ st.label }}</span></div>
+      </sc-for>
+    </div>
+
+    <sc-if value="{{ fr0 }}" hint-placeholder-val="{{ true }}">
+      <div style="display:flex;flex-direction:column;gap:6px"><h1 style="margin:0;font-size:20px;font-weight:600">Allow the microphone</h1><p style="margin:0;color:#94a3b8;text-wrap:pretty">WinWhispr only listens while you hold the talk key. Nothing is recorded in the background.</p></div>
+      <sc-if value="{{ frMicOff }}" hint-placeholder-val="{{ true }}">
+        <button onClick="{{ frAllowMic }}" style="height:40px;padding:0 16px;align-self:flex-start;display:flex;align-items:center;gap:8px;background:#22c55e;border:0;border-radius:8px;color:#0f172a;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer" style-hover="background:#4ade80" style-focus="outline:2px solid #22c55e;outline-offset:2px">{{ icons.micDark }}Allow microphone</button>
+      </sc-if>
+      <sc-if value="{{ frMicOn }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;align-items:center;gap:10px;height:40px;padding:0 14px;background:#0f172a;border:1px solid #2e3c56;border-radius:8px;color:#f8fafc">{{ icons.checkGreen }}<span>Microphone ready</span></div>
+      </sc-if>
+      <div style="display:flex;justify-content:flex-end"><button onClick="{{ frNext }}" disabled="{{ frMicOff }}" style="height:40px;padding:0 16px;background:#1e293b;border:1px solid #2e3c56;border-radius:8px;color:#f8fafc;font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;opacity:{{ frNextOp }}" style-hover="background:#273449" style-focus="outline:2px solid #22c55e;outline-offset:2px">Next</button></div>
+    </sc-if>
+
+    <sc-if value="{{ fr1 }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;flex-direction:column;gap:6px"><h1 style="margin:0;font-size:20px;font-weight:600">Pick your language</h1><p style="margin:0;color:#94a3b8;text-wrap:pretty">The language you'll speak. You won't be asked again — you can change it later under Dictation.</p></div>
+      <label style="display:flex;flex-direction:column;gap:6px"><span style="color:#94a3b8;font-weight:500">Language</span>
+        <span style="position:relative;display:block"><select value="{{ lang }}" onChange="{{ setLang }}" style="height:40px;width:100%;appearance:none;-webkit-appearance:none;background:#0f172a;border:1px solid #2e3c56;border-radius:8px;color:#f8fafc;padding:0 40px 0 12px;font-family:inherit;font-size:13px;cursor:pointer" style-focus="outline:2px solid #22c55e;outline-offset:2px"><sc-for list="{{ langs }}" as="l" hint-placeholder-count="4"><option value="{{ l }}">{{ l }}</option></sc-for></select><span style="position:absolute;right:12px;top:10px;pointer-events:none;color:#94a3b8">{{ icons.chevron }}</span></span></label>
+      <div style="display:flex;justify-content:space-between"><button onClick="{{ frBack }}" style="height:40px;padding:0 16px;background:transparent;border:1px solid #2e3c56;border-radius:8px;color:#94a3b8;font-family:inherit;font-size:13px;cursor:pointer" style-hover="color:#f8fafc" style-focus="outline:2px solid #22c55e;outline-offset:2px">Back</button><button onClick="{{ frNext }}" style="height:40px;padding:0 16px;background:#22c55e;border:0;border-radius:8px;color:#0f172a;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer" style-hover="background:#4ade80" style-focus="outline:2px solid #22c55e;outline-offset:2px">Next</button></div>
+    </sc-if>
+
+    <sc-if value="{{ fr2 }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;flex-direction:column;gap:6px"><h1 style="margin:0;font-size:20px;font-weight:600">Try the key</h1><p style="margin:0;color:#94a3b8;text-wrap:pretty">Hold <kbd style="font-family:'JetBrains Mono',monospace;font-size:12px;padding:2px 6px;background:#0f172a;border:1px solid #2e3c56;border-radius:6px;color:#f8fafc">Right Ctrl</kbd> and say anything. Release to type. In this preview, hold <kbd style="font-family:'JetBrains Mono',monospace;font-size:12px;padding:2px 6px;background:#0f172a;border:1px solid #2e3c56;border-radius:6px;color:#f8fafc">Space</kbd> or press and hold the pill.</p></div>
+      <div style="min-height:80px;padding:12px 14px;background:#0f172a;border:1px solid #2e3c56;border-radius:8px;color:{{ typedColor }};text-wrap:pretty">{{ typedOrHint }}</div>
+      <div style="display:flex;justify-content:center;min-height:62px;align-items:center">
+        <sc-if value="{{ demoReady }}" hint-placeholder-val="{{ true }}">
+          <button onMouseDown="{{ startDemo }}" onMouseUp="{{ stopDemo }}" onMouseLeave="{{ stopDemo }}" onTouchStart="{{ startDemo }}" onTouchEnd="{{ stopDemo }}" style="width:128px;height:30px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;gap:8px;background:#16203a;border:1px solid #2e3c56;border-radius:99px;color:#f8fafc;font-family:inherit;font-size:13px;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,.4);user-select:none" style-focus="outline:2px solid #22c55e;outline-offset:2px"><span style="width:8px;height:8px;border-radius:99px;background:#22c55e"></span><span>Ready</span></button>
+        </sc-if>
+        <sc-if value="{{ demoListening }}" hint-placeholder-val="{{ false }}">
+          <div onMouseUp="{{ stopDemo }}" onMouseLeave="{{ stopDemo }}" onTouchEnd="{{ stopDemo }}" style="width:340px;max-width:100%;height:62px;box-sizing:border-box;display:flex;align-items:center;gap:12px;padding:0 18px 0 14px;background:#16203a;border:1px solid #22c55e;border-radius:99px;box-shadow:0 8px 24px rgba(0,0,0,.4),0 0 0 4px rgba(34,197,94,.12);user-select:none">{{ wave }}<span style="flex:1;min-width:0;font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">{{ demoText }}</span></div>
+        </sc-if>
+        <sc-if value="{{ demoTyping }}" hint-placeholder-val="{{ false }}">
+          <div style="width:128px;height:30px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;gap:8px;background:#16203a;border:1px solid #2e3c56;border-radius:99px;box-shadow:0 8px 24px rgba(0,0,0,.4)">{{ pulseDot }}<span>Typing…</span></div>
+        </sc-if>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center"><button onClick="{{ frBack }}" style="height:40px;padding:0 16px;background:transparent;border:1px solid #2e3c56;border-radius:8px;color:#94a3b8;font-family:inherit;font-size:13px;cursor:pointer" style-hover="color:#f8fafc" style-focus="outline:2px solid #22c55e;outline-offset:2px">Back</button>
+        <sc-if value="{{ frTried }}" hint-placeholder-val="{{ false }}"><button onClick="{{ frFinish }}" style="height:40px;padding:0 16px;display:flex;align-items:center;gap:8px;background:#22c55e;border:0;border-radius:8px;color:#0f172a;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer" style-hover="background:#4ade80" style-focus="outline:2px solid #22c55e;outline-offset:2px">{{ icons.checkDark }}That worked — finish</button></sc-if>
+        <sc-if value="{{ frNotTried }}" hint-placeholder-val="{{ true }}"><span style="color:#64748b">Finish unlocks after your first dictation</span></sc-if>
+      </div>
+    </sc-if>
+  </div>
+</div>
+</sc-if>
+
+<!-- ============ TRAY ============ -->
+<sc-if value="{{ isTray }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Tray menu" style="max-width:1100px;margin:0 auto;padding:32px 24px 64px;display:flex;flex-direction:column;gap:24px">
+  <div><h1 style="margin:0;font-size:20px;font-weight:600">System tray</h1><p style="margin:6px 0 0;color:#94a3b8;max-width:640px">Where the app lives. There is no taskbar window most of the time.</p></div>
+  <div style="background:linear-gradient(180deg,#0b1222,#121b31);border:1px solid #2e3c56;border-radius:12px;overflow:hidden;position:relative;min-height:280px;display:flex;flex-direction:column;justify-content:flex-end">
+    <div style="display:flex;justify-content:flex-end;padding:0 16px 8px">
+      <div role="menu" style="width:208px;padding:4px;background:#1e293b;border:1px solid #2e3c56;border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,.5);display:flex;flex-direction:column;gap:2px">
+        <button role="menuitem" onClick="{{ goMain }}" style="height:40px;display:flex;align-items:center;gap:10px;padding:0 10px;border:0;border-radius:6px;background:transparent;color:#f8fafc;font-family:inherit;font-size:13px;cursor:pointer;text-align:left" style-hover="background:#273449" style-focus="outline:2px solid #22c55e;outline-offset:-2px">{{ icons.window }}Open</button>
+        <button role="menuitem" style="height:40px;display:flex;align-items:center;gap:10px;padding:0 10px;border:0;border-radius:6px;background:transparent;color:#f8fafc;font-family:inherit;font-size:13px;cursor:pointer;text-align:left" style-hover="background:#273449" style-focus="outline:2px solid #22c55e;outline-offset:-2px">{{ icons.rotate }}Restart dictation</button>
+        <div style="height:1px;background:#2e3c56;margin:4px 6px"></div>
+        <button role="menuitem" style="height:40px;display:flex;align-items:center;gap:10px;padding:0 10px;border:0;border-radius:6px;background:transparent;color:#f8fafc;font-family:inherit;font-size:13px;cursor:pointer;text-align:left" style-hover="background:#273449" style-focus="outline:2px solid #22c55e;outline-offset:-2px">{{ icons.power }}Quit</button>
+      </div>
+    </div>
+    <div style="height:48px;background:#0a0f1c;border-top:1px solid #2e3c56;display:flex;align-items:center;justify-content:flex-end;gap:4px;padding:0 12px;color:#64748b">
+      <span style="width:32px;height:32px;display:flex;align-items:center;justify-content:center">{{ icons.globeSm }}</span>
+      <span style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:#273449;border-radius:6px;color:#22c55e">{{ icons.micSm }}</span>
+      <span style="margin-left:8px;font-family:'JetBrains Mono',monospace;font-size:12px;color:#94a3b8">14:32</span>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<!-- ============ MAIN WINDOW ============ -->
+<sc-if value="{{ isMain }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Main window" style="padding:24px 16px 64px">
+<div style="width:{{ winWidth }}px;max-width:100%;height:720px;margin:0 auto;background:#0f172a;border:1px solid #2e3c56;border-radius:12px;overflow:hidden;display:flex;flex-direction:column;position:relative;box-shadow:0 24px 64px rgba(0,0,0,.5)">
+  <div style="height:40px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 4px 0 16px;border-bottom:1px solid #2e3c56">
+    <div style="display:flex;align-items:center;gap:8px;font-weight:500"><span style="width:8px;height:8px;border-radius:99px;background:#22c55e"></span>WinWhispr</div>
+    <div style="display:flex;color:#94a3b8"><span style="width:40px;height:40px;display:flex;align-items:center;justify-content:center">{{ icons.minus }}</span><span style="width:40px;height:40px;display:flex;align-items:center;justify-content:center">{{ icons.square }}</span><span style="width:40px;height:40px;display:flex;align-items:center;justify-content:center">{{ icons.x }}</span></div>
+  </div>
+
+  <sc-if value="{{ narrow }}" hint-placeholder-val="{{ false }}">
+    <div role="tablist" style="flex:none;display:flex;gap:4px;padding:8px 12px 0;border-bottom:1px solid #2e3c56;overflow-x:auto;scrollbar-width:none">
+      <sc-for list="{{ navItems }}" as="n" hint-placeholder-count="5">
+        <button role="tab" onClick="{{ n.go }}" style="flex:none;height:40px;display:flex;align-items:center;gap:8px;padding:0 12px;border:0;border-bottom:2px solid {{ n.edge }};background:transparent;color:{{ n.color }};font-weight:{{ n.weight }};font-family:inherit;font-size:13px;cursor:pointer;white-space:nowrap" style-focus="outline:2px solid #22c55e;outline-offset:-2px">{{ n.icon }}<span>{{ n.label }}</span></button>
+      </sc-for>
+    </div>
+  </sc-if>
+
+  <div style="display:flex;flex:1;min-height:0">
+    <sc-if value="{{ wide }}" hint-placeholder-val="{{ true }}">
+      <nav style="width:248px;flex:none;padding:12px 12px 12px 0;border-right:1px solid #2e3c56;display:flex;flex-direction:column;gap:4px">
+        <sc-for list="{{ navItems }}" as="n" hint-placeholder-count="5">
+          <button onClick="{{ n.go }}" style="height:40px;display:flex;align-items:center;gap:12px;padding:0 14px 0 14px;border:0;border-left:2px solid {{ n.edge }};border-radius:0 8px 8px 0;background:{{ n.bg }};color:{{ n.color }};font-weight:{{ n.weight }};font-family:inherit;font-size:13px;cursor:pointer;text-align:left;transition:background 160ms ease-out" style-hover="background:#1e293b" style-focus="outline:2px solid #22c55e;outline-offset:-2px">{{ n.icon }}<span>{{ n.label }}</span></button>
+        </sc-for>
+      </nav>
+    </sc-if>
+
+    <div style="flex:1;min-width:0;overflow-y:auto;overflow-x:hidden;padding:{{ pad }}">
+    <div style="max-width:860px;margin:0 auto;display:flex;flex-direction:column;gap:16px">
+
+    <!-- DICTATION -->
+    <sc-if value="{{ tabDictation }}" hint-placeholder-val="{{ true }}">
+      <h1 style="margin:0 0 4px;font-size:20px;font-weight:600">Dictation</h1>
+
+      <section style="background:#16203a;border:1px solid #2e3c56;border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:16px">
+        <div><h2 style="margin:0;font-size:15px;font-weight:600">Speech engine</h2><p style="margin:4px 0 0;color:#94a3b8">Decides where your voice is turned into text.</p></div>
+        <div role="radiogroup" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px">
+          <sc-for list="{{ engines }}" as="e" hint-placeholder-count="2">
+            <button role="radio" aria-checked="{{ e.checked }}" onClick="{{ e.go }}" style="text-align:left;display:flex;flex-direction:column;gap:12px;padding:16px;background:#0f172a;border:1px solid {{ e.border }};border-radius:12px;color:#f8fafc;font-family:inherit;font-size:13px;cursor:pointer;transition:border-color 160ms ease-out" style-hover="border-color:#94a3b8" style-focus="outline:2px solid #22c55e;outline-offset:2px">
+              <div style="display:flex;align-items:center;gap:10px"><span style="color:{{ e.iconColor }}">{{ e.icon }}</span><span style="font-weight:600;font-size:14px">{{ e.name }}</span><span style="margin-left:auto;width:18px;height:18px;border-radius:99px;border:1px solid {{ e.border }};display:flex;align-items:center;justify-content:center;background:{{ e.dotBg }}">{{ e.check }}</span></div>
+              <p style="margin:0;color:#94a3b8">{{ e.summary }}</p>
+              <dl style="margin:0;display:grid;grid-template-columns:auto 1fr;gap:6px 12px">
+                <dt style="color:#64748b">Setup</dt><dd style="margin:0">{{ e.setup }}</dd>
+                <dt style="color:#64748b">Speed</dt><dd style="margin:0">{{ e.speed }}</dd>
+                <dt style="color:#64748b">Privacy</dt><dd style="margin:0">{{ e.privacy }}</dd>
+              </dl>
+            </button>
+          </sc-for>
+        </div>
+      </section>
+
+      <sc-if value="{{ localEngine }}" hint-placeholder-val="{{ false }}">
+        <section style="background:#16203a;border:1px solid #2e3c56;border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:16px">
+          <div><h2 style="margin:0;font-size:15px;font-weight:600">Local model</h2><p style="margin:4px 0 0;color:#94a3b8">Downloaded once, then everything runs on this PC with no internet.</p></div>
+          <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:12px 14px;background:#0f172a;border:1px solid #2e3c56;border-radius:8px">
+            <span style="color:#22c55e">{{ icons.cpu }}</span>
+            <div style="flex:1;min-width:160px"><div style="font-weight:500">Whisper base</div><div style="color:#94a3b8"><span style="font-family:'JetBrains Mono',monospace;font-size:12px">148 MB</span> · {{ modelStatus }}</div></div>
+            <sc-if value="{{ modelDownloaded }}" hint-placeholder-val="{{ true }}"><span style="display:flex;align-items:center;gap:6px;color:#22c55e;font-weight:500">{{ icons.checkGreen }}Ready</span></sc-if>
+            <sc-if value="{{ modelMissing }}" hint-placeholder-val="{{ false }}"><button onClick="{{ downloadModel }}" style="height:40px;padding:0 16px;display:flex;align-items:center;gap:8px;background:#22c55e;border:0;border-radius:8px;color:#0f172a;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer" style-hover="background:#4ade80" style-focus="outline:2px solid #22c55e;outline-offset:2px">{{ icons.downloadDark }}Download 148 MB</button></sc-if>
+            <sc-if value="{{ modelDownloading }}" hint-placeholder-val="{{ false }}"><div style="width:160px;height:6px;background:#1e293b;border-radius:99px;overflow:hidden"><div style="height:100%;width:{{ dlPct }}%;background:#22c55e;transition:width 200ms ease-out"></div></div></sc-if>
+          </div>
+        </section>
+      </sc-if>
+
+      <section style="background:#16203a;border:1px solid #2e3c56;border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:16px">
+        <div><h2 style="margin:0;font-size:15px;font-weight:600">Language</h2><p style="margin:4px 0 0;color:#94a3b8">The language you speak. Recognition and cleanup both follow it.</p></div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px">
+          <label style="display:flex;flex-direction:column;gap:6px"><span style="color:#94a3b8;font-weight:500">Spoken language</span>
+            <span style="position:relative;display:block"><select value="{{ lang }}" onChange="{{ setLang }}" style="height:40px;width:100%;appearance:none;-webkit-appearance:none;background:#0f172a;border:1px solid #2e3c56;border-radius:8px;color:#f8fafc;padding:0 40px 0 12px;font-family:inherit;font-size:13px;cursor:pointer" style-focus="outline:2px solid #22c55e;outline-offset:2px"><sc-for list="{{ langs }}" as="l" hint-placeholder-count="4"><option value="{{ l }}">{{ l }}</option></sc-for></select><span style="position:absolute;right:12px;top:10px;pointer-events:none;color:#94a3b8">{{ icons.chevron }}</span></span></label>
+        </div>
+      </section>
+
+      <section style="background:#16203a;border:1px solid #2e3c56;border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:16px">
+        <div><h2 style="margin:0;font-size:15px;font-weight:600">Keys</h2><p style="margin:4px 0 0;color:#94a3b8">Hold the talk key and speak. Release it and your words are typed where your cursor is.</p></div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px">
+          <div style="display:flex;flex-direction:column;gap:6px"><span style="color:#94a3b8;font-weight:500">Talk key</span>
+            <div style="display:flex;gap:8px"><kbd style="flex:1;height:40px;box-sizing:border-box;display:flex;align-items:center;padding:0 12px;background:#0f172a;border:1px solid #2e3c56;border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:13px">Right Ctrl</kbd><button style="height:40px;padding:0 14px;background:#1e293b;border:1px solid #2e3c56;border-radius:8px;color:#f8fafc;font-family:inherit;font-size:13px;font-weight:500;cursor:pointer" style-hover="background:#273449" style-focus="outline:2px solid #22c55e;outline-offset:2px">Change</button></div></div>
+          <div style="display:flex;flex-direction:column;gap:6px"><span style="color:#94a3b8;font-weight:500">Cancel key <span style="color:#64748b;font-weight:400">— drops what you just said</span></span>
+            <div style="display:flex;gap:8px"><kbd style="flex:1;height:40px;box-sizing:border-box;display:flex;align-items:center;padding:0 12px;background:#0f172a;border:1px solid #2e3c56;border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:13px">Esc</kbd><button style="height:40px;padding:0 14px;background:#1e293b;border:1px solid #2e3c56;border-radius:8px;color:#f8fafc;font-family:inherit;font-size:13px;font-weight:500;cursor:pointer" style-hover="background:#273449" style-focus="outline:2px solid #22c55e;outline-offset:2px">Change</button></div></div>
+        </div>
+        <div style="height:1px;background:#2e3c56"></div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <button role="switch" aria-checked="{{ lock }}" onClick="{{ toggleLock }}" style="min-height:40px;display:flex;align-items:center;gap:16px;padding:6px 0;border:0;background:transparent;color:#f8fafc;font-family:inherit;font-size:13px;cursor:pointer;text-align:left;border-radius:8px" style-focus="outline:2px solid #22c55e;outline-offset:2px">
+            <span style="flex:1;min-width:0"><span style="display:block;font-weight:500">Tap twice to lock</span><span style="display:block;color:#94a3b8">Tap the talk key twice to keep listening without holding it. Tap once more to stop.</span></span>
+            <span style="width:36px;height:20px;flex:none;border-radius:99px;background:{{ lockBg }};position:relative;transition:background 160ms ease-out"><span style="position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:99px;background:#f8fafc;transform:translateX({{ lockX }}px);transition:transform 160ms ease-out"></span></span>
+          </button>
+          <button role="switch" aria-checked="{{ sound }}" onClick="{{ toggleSound }}" style="min-height:40px;display:flex;align-items:center;gap:16px;padding:6px 0;border:0;background:transparent;color:#f8fafc;font-family:inherit;font-size:13px;cursor:pointer;text-align:left;border-radius:8px" style-focus="outline:2px solid #22c55e;outline-offset:2px">
+            <span style="flex:1;min-width:0"><span style="display:block;font-weight:500">Sound on start</span><span style="display:block;color:#94a3b8">A short click when the microphone opens, so you know it heard you press.</span></span>
+            <span style="width:36px;height:20px;flex:none;border-radius:99px;background:{{ soundBg }};position:relative;transition:background 160ms ease-out"><span style="position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:99px;background:#f8fafc;transform:translateX({{ soundX }}px);transition:transform 160ms ease-out"></span></span>
+          </button>
+        </div>
+      </section>
+    </sc-if>
+
+    <!-- CLEANUP -->
+    <sc-if value="{{ tabCleanup }}" hint-placeholder-val="{{ false }}">
+      <h1 style="margin:0 0 4px;font-size:20px;font-weight:600">Cleanup</h1>
+      <section style="background:#16203a;border:1px solid #2e3c56;border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:16px">
+        <div><h2 style="margin:0;font-size:15px;font-weight:600">How much to tidy</h2><p style="margin:4px 0 0;color:#94a3b8">Runs on every transcript before it is typed. Higher levels change more of your wording.</p></div>
+        <div role="radiogroup" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px">
+          <sc-for list="{{ levels }}" as="lv" hint-placeholder-count="4">
+            <button role="radio" aria-checked="{{ lv.checked }}" onClick="{{ lv.go }}" style="min-height:40px;display:flex;flex-direction:column;gap:4px;padding:12px 14px;text-align:left;background:{{ lv.bg }};border:1px solid {{ lv.border }};border-radius:8px;color:#f8fafc;font-family:inherit;font-size:13px;cursor:pointer;transition:border-color 160ms ease-out" style-hover="border-color:#94a3b8" style-focus="outline:2px solid #22c55e;outline-offset:2px"><span style="display:flex;align-items:center;gap:8px;font-weight:600">{{ lv.name }}<span style="color:#64748b;font-weight:400;font-size:12px">{{ lv.tag }}</span></span><span style="color:#94a3b8;text-wrap:pretty">{{ lv.desc }}</span></button>
+          </sc-for>
+        </div>
+      </section>
+
+      <section style="background:#16203a;border:1px solid #2e3c56;border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:16px">
+        <div><h2 style="margin:0;font-size:15px;font-weight:600">What {{ levelName }} does</h2><p style="margin:4px 0 0;color:#94a3b8">A real sentence, spoken with fillers and a change of mind.</p></div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px">
+          <div style="display:flex;flex-direction:column;gap:8px"><span style="color:#64748b;font-weight:500;font-size:12px;letter-spacing:.04em;text-transform:uppercase">You said</span>
+            <p style="margin:0;padding:14px;background:#0f172a;border:1px solid #2e3c56;border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:12.5px;line-height:1.7;text-wrap:pretty"><sc-for list="{{ segments }}" as="sg" hint-placeholder-count="6"><span style="color:{{ sg.color }};text-decoration:{{ sg.deco }};text-decoration-color:#64748b">{{ sg.t }} </span></sc-for></p></div>
+          <div style="display:flex;flex-direction:column;gap:8px"><span style="color:#22c55e;font-weight:500;font-size:12px;letter-spacing:.04em;text-transform:uppercase">Typed</span>
+            <p style="margin:0;padding:14px;background:#0f172a;border:1px solid #22c55e;border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:12.5px;line-height:1.7;text-wrap:pretty">{{ levelOutput }}</p></div>
+        </div>
+        <ul style="margin:0;padding:0;list-style:none;display:flex;flex-wrap:wrap;gap:8px">
+          <sc-for list="{{ levelChanges }}" as="ch" hint-placeholder-count="3"><li style="display:flex;align-items:center;gap:6px;height:28px;padding:0 10px;background:#1e293b;border-radius:99px;color:{{ ch.color }}">{{ ch.icon }}{{ ch.t }}</li></sc-for>
+        </ul>
+      </section>
+
+      <section style="display:flex;gap:14px;align-items:flex-start;padding:16px 20px;background:#16203a;border:1px solid #2e3c56;border-radius:12px">
+        <span style="color:#22c55e;flex:none;margin-top:1px">{{ icons.shield }}</span>
+        <div><h2 style="margin:0;font-size:15px;font-weight:600">Cleanup can improve your text. It can never lose it.</h2><p style="margin:4px 0 0;color:#94a3b8;text-wrap:pretty">Every result is checked against the raw words. If the cleaned version looks like it changed what you meant, the raw words are typed instead — at every level.</p></div>
+      </section>
+    </sc-if>
+
+    <!-- DICTIONARY -->
+    <sc-if value="{{ tabDictionary }}" hint-placeholder-val="{{ false }}">
+      <h1 style="margin:0 0 4px;font-size:20px;font-weight:600">Dictionary</h1>
+      <section style="background:#16203a;border:1px solid #2e3c56;border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:16px">
+        <div><h2 style="margin:0;font-size:15px;font-weight:600">Add a word</h2><p style="margin:4px 0 0;color:#94a3b8">Names, products, jargon. When the recognizer hears one of the mishearings, it types the word instead.</p></div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;align-items:end">
+          <label style="display:flex;flex-direction:column;gap:6px"><span style="color:#94a3b8;font-weight:500">Word</span><input value="{{ newWord }}" onChange="{{ setNewWord }}" placeholder="Anaïs" style="height:40px;box-sizing:border-box;width:100%;background:#0f172a;border:1px solid #2e3c56;border-radius:8px;color:#f8fafc;padding:0 12px;font-family:inherit;font-size:13px" style-focus="outline:2px solid #22c55e;outline-offset:2px"></label>
+          <label style="display:flex;flex-direction:column;gap:6px"><span style="color:#94a3b8;font-weight:500">Often heard as <span style="color:#64748b;font-weight:400">— separate with commas</span></span><input value="{{ newHeard }}" onChange="{{ setNewHeard }}" placeholder="an ice, anise" style="height:40px;box-sizing:border-box;width:100%;background:#0f172a;border:1px solid #2e3c56;border-radius:8px;color:#f8fafc;padding:0 12px;font-family:inherit;font-size:13px" style-focus="outline:2px solid #22c55e;outline-offset:2px"></label>
+          <button onClick="{{ addWord }}" disabled="{{ addDisabled }}" style="height:40px;padding:0 16px;background:#22c55e;border:0;border-radius:8px;color:#0f172a;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;opacity:{{ addOp }}" style-hover="background:#4ade80" style-focus="outline:2px solid #22c55e;outline-offset:2px">Add word</button>
+        </div>
+      </section>
+
+      <section style="background:#16203a;border:1px solid #2e3c56;border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:16px">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px"><h2 style="margin:0;font-size:15px;font-weight:600">Known words</h2><span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#64748b">{{ wordCount }}</span></div>
+        <sc-if value="{{ hasWords }}" hint-placeholder-val="{{ true }}">
+          <ul style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column">
+            <sc-for list="{{ wordRows }}" as="w" hint-placeholder-count="4">
+              <li style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:10px 0;border-top:1px solid #2e3c56">
+                <span style="font-weight:600;min-width:120px">{{ w.word }}</span>
+                <span style="flex:1;min-width:160px;display:flex;flex-wrap:wrap;gap:6px"><sc-for list="{{ w.heard }}" as="h" hint-placeholder-count="2"><span style="padding:3px 8px;background:#0f172a;border:1px solid #2e3c56;border-radius:99px;font-family:'JetBrains Mono',monospace;font-size:12px;color:#94a3b8">{{ h }}</span></sc-for></span>
+                <span style="display:flex;align-items:center;gap:6px;height:24px;padding:0 8px;border-radius:99px;border:1px solid {{ w.badgeBorder }};color:{{ w.badgeColor }};font-size:12px;font-weight:500">{{ w.badgeIcon }}{{ w.badge }}</span>
+                <button onClick="{{ w.remove }}" aria-label="Remove word" style="width:40px;height:40px;display:flex;align-items:center;justify-content:center;border:0;border-radius:8px;background:transparent;color:#94a3b8;cursor:pointer" style-hover="background:#1e293b;color:#f8fafc" style-focus="outline:2px solid #22c55e;outline-offset:-2px">{{ icons.trash }}</button>
+              </li>
+            </sc-for>
+          </ul>
+        </sc-if>
+        <sc-if value="{{ noWords }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;padding:32px 16px;border:1px dashed #2e3c56;border-radius:8px"><span style="color:#64748b">{{ icons.book }}</span><p style="margin:0;font-weight:500">No words yet</p><p style="margin:0;color:#94a3b8;max-width:360px;text-wrap:pretty">Add a name or term WinWhispr keeps getting wrong. It will also learn words on its own when you correct it a few times.</p></div>
+        </sc-if>
+      </section>
+    </sc-if>
+
+    <!-- ACTIVITY -->
+    <sc-if value="{{ tabActivity }}" hint-placeholder-val="{{ false }}">
+      <h1 style="margin:0 0 4px;font-size:20px;font-weight:600">Activity</h1>
+
+      <sc-if value="{{ loading }}" hint-placeholder-val="{{ false }}">
+        <div aria-busy="true" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px">
+          <sc-for list="{{ four }}" as="k" hint-placeholder-count="4"><div style="background:#16203a;border:1px solid #2e3c56;border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:10px"><span style="height:12px;width:70%;border-radius:4px;background:#273449;animation:ww-skel 1.4s ease-in-out infinite"></span><span style="height:28px;width:50%;border-radius:6px;background:#273449;animation:ww-skel 1.4s ease-in-out infinite"></span><span style="height:12px;width:40%;border-radius:4px;background:#1e293b;animation:ww-skel 1.4s ease-in-out infinite"></span></div></sc-for>
+        </div>
+        <div style="background:#16203a;border:1px solid #2e3c56;border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:16px"><span style="height:14px;width:120px;border-radius:4px;background:#273449;animation:ww-skel 1.4s ease-in-out infinite"></span><div style="display:flex;align-items:flex-end;gap:12px;height:140px"><sc-for list="{{ skelBars }}" as="b" hint-placeholder-count="7"><span style="flex:1;height:{{ b }}%;border-radius:6px 6px 0 0;background:#273449;animation:ww-skel 1.4s ease-in-out infinite"></span></sc-for></div></div>
+        <div style="background:#16203a;border:1px solid #2e3c56;border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:14px"><span style="height:40px;border-radius:8px;background:#0f172a;border:1px solid #2e3c56"></span><sc-for list="{{ four }}" as="k" hint-placeholder-count="4"><div style="display:flex;flex-direction:column;gap:8px;padding:10px 0;border-top:1px solid #2e3c56"><span style="height:11px;width:180px;border-radius:4px;background:#273449;animation:ww-skel 1.4s ease-in-out infinite"></span><span style="height:13px;width:85%;border-radius:4px;background:#1e293b;animation:ww-skel 1.4s ease-in-out infinite"></span></div></sc-for></div>
+      </sc-if>
+
+      <sc-if value="{{ notLoading }}" hint-placeholder-val="{{ true }}">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px">
+          <sc-for list="{{ metrics }}" as="m" hint-placeholder-count="4">
+            <div style="background:#16203a;border:1px solid #2e3c56;border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:4px"><span style="color:#94a3b8;font-weight:500">{{ m.label }}</span><span style="font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:500;line-height:1.2;color:{{ m.color }}">{{ m.value }}</span><span style="color:#64748b">{{ m.sub }}</span></div>
+          </sc-for>
+        </div>
+
+        <section style="background:#16203a;border:1px solid #2e3c56;border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:16px">
+          <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px"><h2 style="margin:0;font-size:15px;font-weight:600">Last seven days</h2><span style="color:#64748b">words per day</span></div>
+          <div style="display:flex;align-items:flex-end;gap:8px;height:160px">
+            <sc-for list="{{ bars }}" as="b" hint-placeholder-count="7">
+              <div style="flex:1;min-width:0;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:6px"><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:{{ b.valColor }}">{{ b.val }}</span><span style="width:100%;max-width:48px;height:{{ b.h }}%;min-height:2px;border-radius:6px 6px 2px 2px;background:{{ b.bg }}"></span><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:{{ b.labelColor }}">{{ b.day }}</span></div>
+            </sc-for>
+          </div>
+        </section>
+
+        <section style="background:#16203a;border:1px solid #2e3c56;border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:14px">
+          <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px"><h2 style="margin:0;font-size:15px;font-weight:600">Transcripts</h2>
+            <label style="position:relative;display:block;flex:1;min-width:200px;max-width:320px"><span style="position:absolute;left:12px;top:10px;color:#64748b;pointer-events:none">{{ icons.search }}</span><input value="{{ query }}" onChange="{{ setQuery }}" placeholder="Search what you said" aria-label="Search transcripts" style="height:40px;box-sizing:border-box;width:100%;background:#0f172a;border:1px solid #2e3c56;border-radius:8px;color:#f8fafc;padding:0 12px 0 38px;font-family:inherit;font-size:13px" style-focus="outline:2px solid #22c55e;outline-offset:2px"></label></div>
+          <sc-if value="{{ hasTranscripts }}" hint-placeholder-val="{{ true }}">
+            <ul style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column">
+              <sc-for list="{{ transcriptRows }}" as="t" hint-placeholder-count="5">
+                <li style="display:flex;flex-direction:column;gap:4px;padding:12px 0;border-top:1px solid #2e3c56">
+                  <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;color:#64748b;font-size:12px"><span style="font-family:'JetBrains Mono',monospace;color:#94a3b8">{{ t.time }}</span><span>·</span><span style="font-family:'JetBrains Mono',monospace">{{ t.words }} words</span><span>·</span><span style="display:flex;align-items:center;gap:6px">into <span style="padding:2px 8px;background:#1e293b;border-radius:99px;color:#94a3b8;font-weight:500">{{ t.app }}</span></span></div>
+                  <p style="margin:0;font-family:'JetBrains Mono',monospace;font-size:12.5px;line-height:1.55;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">{{ t.text }}</p>
+                </li>
+              </sc-for>
+            </ul>
+          </sc-if>
+          <sc-if value="{{ noTranscripts }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;padding:32px 16px;border:1px dashed #2e3c56;border-radius:8px"><span style="color:#64748b">{{ icons.activity }}</span><p style="margin:0;font-weight:500">{{ emptyTitle }}</p><p style="margin:0;color:#94a3b8;max-width:360px;text-wrap:pretty">{{ emptyBody }}</p></div>
+          </sc-if>
+        </section>
+      </sc-if>
+    </sc-if>
+
+    <!-- STORAGE -->
+    <sc-if value="{{ tabStorage }}" hint-placeholder-val="{{ false }}">
+      <h1 style="margin:0 0 4px;font-size:20px;font-weight:600">Storage</h1>
+      <section style="background:#16203a;border:1px solid #2e3c56;border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:16px">
+        <div><h2 style="margin:0;font-size:15px;font-weight:600">Downloaded models</h2><p style="margin:4px 0 0;color:#94a3b8">Only needed for the local engine. The model in use can't be deleted while selected.</p></div>
+        <ul style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column">
+          <sc-for list="{{ modelRows }}" as="m" hint-placeholder-count="2">
+            <li style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:10px 0;border-top:1px solid #2e3c56">
+              <span style="color:{{ m.iconColor }}">{{ icons.cpu }}</span>
+              <span style="flex:1;min-width:140px"><span style="display:block;font-weight:500">{{ m.name }}</span><span style="display:block;color:#94a3b8">{{ m.sub }}</span></span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#94a3b8">{{ m.size }}</span>
+              <button onClick="{{ m.remove }}" disabled="{{ m.inUse }}" title="{{ m.title }}" style="height:40px;padding:0 14px;background:transparent;border:1px solid #2e3c56;border-radius:8px;color:#f8fafc;font-family:inherit;font-size:13px;font-weight:500;cursor:{{ m.cursor }};opacity:{{ m.op }}" style-hover="background:#1e293b" style-focus="outline:2px solid #22c55e;outline-offset:2px">{{ m.action }}</button>
+            </li>
+          </sc-for>
+        </ul>
+        <sc-if value="{{ noModels }}" hint-placeholder-val="{{ false }}"><div style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;padding:24px 16px;border:1px dashed #2e3c56;border-radius:8px"><p style="margin:0;font-weight:500">No models on this PC</p><p style="margin:0;color:#94a3b8;max-width:360px">Choose the local engine under Dictation to download one.</p></div></sc-if>
+      </section>
+
+      <section style="background:#16203a;border:1px solid #2e3c56;border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:12px">
+        <div><h2 style="margin:0;font-size:15px;font-weight:600">Startup</h2><p style="margin:4px 0 0;color:#94a3b8">WinWhispr is small; leaving it running keeps the talk key always ready.</p></div>
+        <button role="switch" aria-checked="{{ startWin }}" onClick="{{ toggleStartWin }}" style="min-height:40px;display:flex;align-items:center;gap:16px;padding:6px 0;border:0;background:transparent;color:#f8fafc;font-family:inherit;font-size:13px;cursor:pointer;text-align:left;border-radius:8px" style-focus="outline:2px solid #22c55e;outline-offset:2px">
+          <span style="flex:1;min-width:0"><span style="display:block;font-weight:500">Start with Windows</span><span style="display:block;color:#94a3b8">Opens quietly in the tray when you sign in.</span></span>
+          <span style="width:36px;height:20px;flex:none;border-radius:99px;background:{{ startBg }};position:relative;transition:background 160ms ease-out"><span style="position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:99px;background:#f8fafc;transform:translateX({{ startX }}px);transition:transform 160ms ease-out"></span></span>
+        </button>
+      </section>
+
+      <section style="background:#16203a;border:1px solid #2e3c56;border-radius:12px;padding:20px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px 24px">
+        <div style="flex:1;min-width:220px"><h2 style="margin:0;font-size:15px;font-weight:600">Erase history</h2><p style="margin:4px 0 0;color:#94a3b8;text-wrap:pretty">Deletes every saved transcript and resets your activity stats. Your dictionary and settings stay.</p></div>
+        <button onClick="{{ openErase }}" style="height:40px;padding:0 16px;background:transparent;border:1px solid #ef4444;border-radius:8px;color:#ef4444;font-family:inherit;font-size:13px;font-weight:500;cursor:pointer" style-hover="background:rgba(239,68,68,.1)" style-focus="outline:2px solid #ef4444;outline-offset:2px">Erase history…</button>
+      </section>
+    </sc-if>
+
+    </div>
+    </div>
+  </div>
+
+  <sc-if value="{{ eraseOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;inset:0;background:rgba(15,23,42,.7);display:flex;align-items:center;justify-content:center;padding:16px;z-index:3">
+      <div role="dialog" aria-modal="true" aria-labelledby="erase-title" style="width:100%;max-width:400px;background:#1e293b;border:1px solid #2e3c56;border-radius:12px;padding:24px;display:flex;flex-direction:column;gap:16px;box-shadow:0 24px 64px rgba(0,0,0,.6)">
+        <div style="display:flex;gap:12px;align-items:flex-start"><span style="color:#ef4444;flex:none">{{ icons.alert }}</span><div><h2 id="erase-title" style="margin:0;font-size:15px;font-weight:600">Erase all history?</h2><p style="margin:6px 0 0;color:#94a3b8;text-wrap:pretty">{{ eraseCount }} transcripts and your activity stats will be deleted. This can't be undone.</p></div></div>
+        <div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap">
+          <button autoFocus="{{ true }}" onClick="{{ closeErase }}" style="height:40px;padding:0 16px;background:#273449;border:1px solid #2e3c56;border-radius:8px;color:#f8fafc;font-family:inherit;font-size:13px;font-weight:500;cursor:pointer" style-hover="background:#2e3c56" style-focus="outline:2px solid #22c55e;outline-offset:2px">Cancel</button>
+          <button onClick="{{ confirmErase }}" style="height:40px;padding:0 16px;background:#ef4444;border:0;border-radius:8px;color:#f8fafc;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer" style-hover="background:#f87171" style-focus="outline:2px solid #ef4444;outline-offset:2px">Erase history</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</div>
+</sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;startScreen&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;pill&quot;,&quot;options&quot;:[&quot;pill&quot;,&quot;firstrun&quot;,&quot;main&quot;,&quot;tray&quot;],&quot;tsType&quot;:&quot;'pill'|'firstrun'|'main'|'tray'&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;loading&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;States&quot;},&quot;emptyStates&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;States&quot;}}">
+const LANGS=['English (US)','English (UK)','Spanish','French','German','Italian','Portuguese (Brazil)','Portuguese (Portugal)','Dutch','Swedish','Norwegian','Danish','Finnish','Polish','Czech','Hungarian','Romanian','Greek','Turkish','Russian','Ukrainian','Arabic','Hebrew','Hindi','Bengali','Indonesian','Malay','Vietnamese','Thai','Chinese (Mandarin)','Japanese','Korean'];
+const P={
+ mic:'M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z M19 10v2a7 7 0 0 1-14 0v-2 M12 19v3',
+ micOff:'M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z M19 10v2a7 7 0 0 1-14 0v-2 M12 19v3 M3 3l18 18',
+ wand:'M15 4V2 M15 16v-2 M8 9h2 M20 9h2 M17.8 11.8 19 13 M17.8 6.2 19 5 M3 21l9-9 M12.2 6.2 11 5',
+ book:'M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20',
+ activity:'M22 12h-4l-3 9L9 3l-3 9H2',
+ db:'M21 5a9 3 0 1 1-18 0a9 3 0 1 1 18 0 M3 5v14a9 3 0 0 0 18 0V5 M3 12a9 3 0 0 0 18 0',
+ check:'M20 6 9 17l-5-5', chevron:'m6 9 6 6 6-6', search:'M19 11a8 8 0 1 1-16 0a8 8 0 1 1 16 0 M21 21l-4.3-4.3',
+ trash:'M3 6h18 M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6 M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2',
+ alert:'M22 12a10 10 0 1 1-20 0a10 10 0 1 1 20 0 M12 8v4 M12 16h.01', x:'M18 6 6 18 M6 6l12 12', minus:'M5 12h14', square:'M5 5h14v14H5z',
+ shield:'M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z',
+ globe:'M22 12a10 10 0 1 1-20 0a10 10 0 1 1 20 0 M12 2a14.5 14.5 0 0 0 0 20a14.5 14.5 0 0 0 0-20 M2 12h20',
+ cpu:'M4 4h16v16H4z M9 9h6v6H9z M15 2v2 M15 20v2 M2 15h2 M2 9h2 M20 15h2 M20 9h2 M9 2v2 M9 20v2',
+ download:'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4 M7 10l5 5 5-5 M12 15V3',
+ rotate:'M21 12a9 9 0 1 1-2.6-6.4L21 8 M21 3v5h-5', power:'M18.4 6.6a9 9 0 1 1-12.8 0 M12 2v10', window:'M3 5h18v14H3z M3 9h18',
+ pencil:'M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z', sparkle:'M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z'
+};
+const ic=(n,s=20,c='currentColor')=>React.createElement('svg',{key:n+s+c,width:s,height:s,viewBox:'0 0 24 24',fill:'none',stroke:c,strokeWidth:1.75,strokeLinecap:'round',strokeLinejoin:'round',style:{flex:'none',display:'block'}},React.createElement('path',{d:P[n]}));
+const SEG=[{t:'um',k:'f'},{t:'so we should'},{t:'uh',k:'f'},{t:'move the meeting to'},{t:'thursday no wait',k:'c'},{t:'friday'},{t:'period',k:'p'},{t:"and I'll send the"},{t:'uh the',k:'f'},{t:'notes after'}];
+const LEVELS=[
+ {id:'none',name:'None',tag:'',desc:'Exactly what you said, as one run of words.',out:"um so we should uh move the meeting to thursday no wait friday period and I'll send the uh the notes after",changes:[]},
+ {id:'light',name:'Light',tag:'default',desc:'Fillers out, punctuation and capitals in. Your wording stays.',out:"So we should move the meeting to Thursday, no wait, Friday. And I'll send the notes after.",changes:['Fillers removed','Spoken punctuation applied','Sentences capitalized']},
+ {id:'medium',name:'Medium',tag:'',desc:'Also resolves changes of mind and repeated words.',out:"So we should move the meeting to Friday. I'll send the notes after.",changes:['Fillers removed','Spoken punctuation applied','Sentences capitalized','Self-corrections resolved']},
+ {id:'high',name:'High',tag:'',desc:'Also tightens wording. Meaning is checked and must stay the same.',out:"Let's move the meeting to Friday. I'll send the notes after.",changes:['Fillers removed','Spoken punctuation applied','Sentences capitalized','Self-corrections resolved','Wording tightened']}
+];
+const WORDS=[{word:'Kubernetes',heard:['cooper netties','kubernetties'],learned:true},{word:'Anaïs',heard:['an ice','anise'],learned:false},{word:'WinWhispr',heard:['win whisper'],learned:true},{word:'Sønderborg',heard:['sunder borg'],learned:false}];
+const TRANSCRIPTS=[
+ {time:'14:32',text:"Move the meeting to Friday. I'll send the notes after.",words:11,app:'Outlook'},
+ {time:'13:05',text:'Can you take a look at the PR when you get a chance? The migration is in the second commit.',words:20,app:'Slack'},
+ {time:'11:48',text:'TODO: handle the empty response case before merging.',words:9,app:'VS Code'},
+ {time:'10:20',text:'Groceries: oat milk, coffee, spinach, and the good bread.',words:10,app:'Notion'},
+ {time:'09:02',text:'Thanks for the quick turnaround yesterday. The revised draft reads much better.',words:12,app:'Word'},
+ {time:'Yesterday',text:'Reminder to book the dentist and call Anaïs about the Sønderborg trip.',words:13,app:'Notes'}
+];
+const DAYS=[{day:'Tue',v:820},{day:'Wed',v:1140},{day:'Thu',v:0},{day:'Fri',v:1560},{day:'Sat',v:410},{day:'Sun',v:990},{day:'Mon',v:1284}];
+const DEMO_WORDS='hello this is my um first dictation with win whispr'.split(' ');
+const DEMO_CLEAN='Hello, this is my first dictation with WinWhispr.';
+
+class Component extends DCLogic {
+  state={screen:this.props.startScreen??'pill',tab:'dictation',width:1100,engine:'browser',lang:'English (US)',lock:false,sound:true,cleanup:'light',words:WORDS,newWord:'',newHeard:'',query:'',startWin:true,models:[{name:'Whisper base',size:'148 MB',inUse:true,sub:'Used by the local engine'},{name:'Whisper small',size:'466 MB',inUse:false,sub:'Not in use'}],eraseOpen:false,transcripts:TRANSCRIPTS,demo:'ready',demoText:'',typed:'',fr:0,frMic:false,frTried:false,ctxOpen:true,model:'done',dlPct:0};
+  componentDidMount(){
+    this.kd=e=>{if(e.code==='Space'&&!e.repeat&&(this.state.screen==='pill'||this.state.screen==='firstrun')&&!/INPUT|SELECT|TEXTAREA|BUTTON/.test(e.target.tagName)){e.preventDefault();this.startDemo();}};
+    this.ku=e=>{if(e.code==='Space'&&this.state.demo==='listening'){e.preventDefault();this.stopDemo();}};
+    window.addEventListener('keydown',this.kd);window.addEventListener('keyup',this.ku);
+  }
+  componentWillUnmount(){window.removeEventListener('keydown',this.kd);window.removeEventListener('keyup',this.ku);clearInterval(this.iv);clearTimeout(this.to);}
+  startDemo=()=>{if(this.state.demo!=='ready')return;clearInterval(this.iv);let i=0;this.setState({demo:'listening',demoText:''});this.iv=setInterval(()=>{i++;if(i>DEMO_WORDS.length){clearInterval(this.iv);return;}this.setState({demoText:DEMO_WORDS.slice(0,i).join(' ')});},240);};
+  stopDemo=()=>{if(this.state.demo!=='listening')return;clearInterval(this.iv);const said=this.state.demoText;this.setState({demo:'typing'});this.to=setTimeout(()=>this.setState({demo:'ready',typed:said?DEMO_CLEAN.split(' ').slice(0,Math.max(1,said.split(' ').length)).join(' ').replace(/[,.]$/,'')+(said.split(' ').length>=DEMO_WORDS.length?'':'…'):'',frTried:this.state.frTried||!!said}),700);};
+  renderVals(){
+    const s=this.state,p=this.props;
+    const loading=p.loading??false, forceEmpty=p.emptyStates??false;
+    const set=o=>()=>this.setState(o);
+    const screens=[['pill','Pill'],['firstrun','First run'],['main','Main window'],['tray','Tray menu']].map(([id,label])=>({label,go:set({screen:id}),bg:s.screen===id?'#273449':'transparent',color:s.screen===id?'#f8fafc':'#94a3b8',weight:s.screen===id?600:400}));
+    const widths=[1100,820,420].map(w=>({label:w+'px',go:set({width:w}),bg:s.width===w?'#273449':'transparent',color:s.width===w?'#f8fafc':'#94a3b8'}));
+    const narrow=s.width<820;
+    const nav=[['dictation','Dictation','mic'],['cleanup','Cleanup','wand'],['dictionary','Dictionary','book'],['activity','Activity','activity'],['storage','Storage','db']];
+    const navItems=nav.map(([id,label,i])=>{const a=s.tab===id;return {label,go:set({tab:id}),icon:ic(i,20,a?'#22c55e':'#94a3b8'),edge:a?'#22c55e':'transparent',bg:a?'#16203a':'transparent',color:a?'#f8fafc':'#94a3b8',weight:a?600:400};});
+    const engines=[{id:'browser',name:'Browser engine',icon:'globe',summary:'The recognizer already on this PC. Nothing to set up.',setup:'Nothing to download',speed:'Instant',privacy:'Audio goes to a cloud speech service. Needs internet.'},{id:'local',name:'Local model',icon:'cpu',summary:'Whisper, running on this machine. Works on a plane.',setup:'One-time 148 MB download',speed:'Slightly slower',privacy:'Fully offline. Audio never leaves this PC.'}].map(e=>{const c=s.engine===e.id;return {...e,checked:c,go:set({engine:e.id}),icon:ic(e.icon,22),iconColor:c?'#22c55e':'#94a3b8',border:c?'#22c55e':'#2e3c56',dotBg:c?'#22c55e':'transparent',check:c?ic('check',12,'#0f172a'):null};});
+    const lvl=LEVELS.find(l=>l.id===s.cleanup);
+    const levels=LEVELS.map(l=>{const c=l.id===s.cleanup;return {...l,checked:c,go:set({cleanup:l.id}),bg:c?'#0f172a':'transparent',border:c?'#22c55e':'#2e3c56'};});
+    const li=LEVELS.indexOf(lvl);
+    const segments=SEG.map(g=>{let color='#f8fafc',deco='none';if(g.k==='f'&&li>=1){color='#64748b';deco='line-through';}if(g.k==='p'&&li>=1){color='#94a3b8';deco='underline dotted';}if(g.k==='c'&&li>=2){color='#64748b';deco='line-through';}return {t:g.t,color,deco};});
+    const levelChanges=lvl.changes.map(t=>({t,color:'#f8fafc',icon:ic('check',14,'#22c55e')}));
+    const words=forceEmpty?[]:s.words;
+    const wordRows=words.map((w,i)=>({...w,badge:w.learned?'Learned':'Added by you',badgeColor:w.learned?'#22c55e':'#94a3b8',badgeBorder:w.learned?'rgba(34,197,94,.4)':'#2e3c56',badgeIcon:ic(w.learned?'sparkle':'pencil',12,w.learned?'#22c55e':'#94a3b8'),remove:()=>this.setState(st=>({words:st.words.filter((_,j)=>j!==i)}))}));
+    const canAdd=s.newWord.trim().length>0;
+    const q=s.query.trim().toLowerCase();
+    const trs=forceEmpty?[]:s.transcripts.filter(t=>!q||t.text.toLowerCase().includes(q)||t.app.toLowerCase().includes(q));
+    const erased=s.transcripts.length===0||forceEmpty;
+    const max=Math.max(...DAYS.map(d=>d.v),1);
+    const bars=DAYS.map((d,i)=>{const today=i===DAYS.length-1;const v=erased?0:d.v;return {day:d.day,val:v?v.toLocaleString():'—',h:Math.round(v/max*100),bg:today?'#22c55e':'#273449',valColor:today?'#22c55e':'#64748b',labelColor:today?'#f8fafc':'#64748b'};});
+    const metrics=erased?[{label:'Words today',value:'0',sub:'nothing dictated yet'},{label:'Words per minute',value:'—',sub:'needs a few sessions'},{label:'Personal best',value:'—',sub:'in one day'},{label:'Day streak',value:'0',sub:'days in a row'}]:[{label:'Words today',value:'1,284',sub:'across 6 dictations',color:'#22c55e'},{label:'Words per minute',value:'142',sub:'7-day average'},{label:'Personal best',value:'3,910',sub:'in one day · Aug 28'},{label:'Day streak',value:'12',sub:'days in a row'}];
+    const models=s.models.map((m,i)=>({...m,iconColor:m.inUse?'#22c55e':'#64748b',sub:m.inUse?(s.engine==='local'?'In use by the local engine':'Selected for the local engine'):'Not in use',title:m.inUse?'Switch models before deleting':'',action:m.inUse?'In use':'Delete',cursor:m.inUse?'not-allowed':'pointer',op:m.inUse?.5:1,remove:()=>this.setState(st=>({models:st.models.filter((_,j)=>j!==i)}))}));
+    const frSteps=['Microphone','Language','Try it'].map((label,i)=>{const done=i<s.fr,cur=i===s.fr;return {label,n:done?'✓':String(i+1),bg:done||cur?'#22c55e':'transparent',fg:done||cur?'#0f172a':'#64748b',border:done||cur?'#22c55e':'#2e3c56',color:cur?'#f8fafc':'#64748b',weight:cur?600:400};});
+    const wave=React.createElement('div',{key:'w',style:{display:'flex',alignItems:'center',gap:3,height:28,flex:'none'}},[...Array(14)].map((_,i)=>React.createElement('span',{key:i,style:{width:3,borderRadius:2,background:'#22c55e',height:8+((i*7)%14),animation:`ww-wave ${800+(i%3)*120}ms ease-in-out ${i*60}ms infinite alternate`}})));
+    const pulseDot=React.createElement('span',{key:'pd',style:{width:8,height:8,borderRadius:99,background:'#22c55e',animation:'ww-pulse 1s ease-out infinite'}});
+    return {
+      screens,widths,isPill:s.screen==='pill',isFirstRun:s.screen==='firstrun',isMain:s.screen==='main',isTray:s.screen==='tray',
+      goMain:set({screen:'main'}),
+      icons:{micOff:ic('micOff',16),micSm:ic('mic',16),globeSm:ic('globe',16),micDark:ic('mic',18,'#0f172a'),checkGreen:ic('check',18,'#22c55e'),checkDark:ic('check',18,'#0f172a'),checkSm:ic('check',16,'#22c55e'),chevron:ic('chevron',18),minus:ic('minus',16),square:ic('square',14),x:ic('x',16),cpu:ic('cpu',22),downloadDark:ic('download',18,'#0f172a'),shield:ic('shield',22),trash:ic('trash',18),book:ic('book',28),activity:ic('activity',28),search:ic('search',18),alert:ic('alert',22),window:ic('window',18,'#94a3b8'),rotate:ic('rotate',18,'#94a3b8'),power:ic('power',18,'#94a3b8')},
+      wave,pulseDot,ctxOpen:s.ctxOpen,toggleCtx:e=>{e&&e.preventDefault&&e.preventDefault();this.setState(st=>({ctxOpen:!st.ctxOpen}));},armDemo:set({screen:'firstrun',fr:0}),
+      demoReady:s.demo==='ready',demoListening:s.demo==='listening',demoTyping:s.demo==='typing',demoText:s.demoText||'…',startDemo:this.startDemo,stopDemo:this.stopDemo,
+      typedOrHint:s.typed||'Your words appear here, cleaned up.',typedColor:s.typed?'#f8fafc':'#64748b',
+      frSteps,fr0:s.fr===0,fr1:s.fr===1,fr2:s.fr===2,frMicOff:!s.frMic,frMicOn:s.frMic,frNextOp:s.frMic||s.fr>0?1:.5,frAllowMic:set({frMic:true}),frNext:()=>this.setState(st=>({fr:Math.min(2,st.fr+1)})),frBack:()=>this.setState(st=>({fr:Math.max(0,st.fr-1)})),frTried:s.frTried,frNotTried:!s.frTried,frFinish:set({screen:'main',tab:'dictation'}),
+      winWidth:s.width,narrow,wide:!narrow,pad:narrow?'16px':'24px 32px 40px',navItems,
+      tabDictation:s.tab==='dictation',tabCleanup:s.tab==='cleanup',tabDictionary:s.tab==='dictionary',tabActivity:s.tab==='activity',tabStorage:s.tab==='storage',
+      engines,localEngine:s.engine==='local',modelStatus:s.model==='done'?'Downloaded':s.model==='dl'?`Downloading ${s.dlPct}%`:'Not downloaded',modelDownloaded:s.model==='done',modelMissing:s.model==='none',modelDownloading:s.model==='dl',dlPct:s.dlPct,
+      downloadModel:()=>{this.setState({model:'dl',dlPct:0});const t=setInterval(()=>this.setState(st=>{if(st.dlPct>=100){clearInterval(t);return {model:'done'};}return {dlPct:st.dlPct+10};}),200);},
+      langs:LANGS,lang:s.lang,setLang:e=>this.setState({lang:e.target.value}),
+      lock:s.lock,toggleLock:set({lock:!s.lock}),lockBg:s.lock?'#22c55e':'#2e3c56',lockX:s.lock?16:0,
+      sound:s.sound,toggleSound:set({sound:!s.sound}),soundBg:s.sound?'#22c55e':'#2e3c56',soundX:s.sound?16:0,
+      levels,levelName:lvl.name,levelOutput:lvl.out,levelChanges,segments,
+      newWord:s.newWord,newHeard:s.newHeard,setNewWord:e=>this.setState({newWord:e.target.value}),setNewHeard:e=>this.setState({newHeard:e.target.value}),addDisabled:!canAdd,addOp:canAdd?1:.5,
+      addWord:()=>{if(!canAdd)return;this.setState(st=>({words:[{word:st.newWord.trim(),heard:st.newHeard.split(',').map(x=>x.trim()).filter(Boolean),learned:false},...st.words],newWord:'',newHeard:''}));},
+      wordRows,wordCount:words.length+(words.length===1?' word':' words'),hasWords:words.length>0,noWords:words.length===0,
+      loading,notLoading:!loading,four:[1,2,3,4],skelBars:[40,60,20,90,30,55,70],metrics,bars,
+      query:s.query,setQuery:e=>this.setState({query:e.target.value}),transcriptRows:trs,hasTranscripts:trs.length>0,noTranscripts:trs.length===0,
+      emptyTitle:erased?'Nothing here yet':'No matches',emptyBody:erased?'Hold Right Ctrl in any app and say something. It will show up here with the app it went into.':`Nothing you said contains "${s.query}". Try a different word.`,
+      modelRows:models,noModels:s.models.length===0,startWin:s.startWin,toggleStartWin:set({startWin:!s.startWin}),startBg:s.startWin?'#22c55e':'#2e3c56',startX:s.startWin?16:0,
+      eraseOpen:s.eraseOpen,openErase:set({eraseOpen:true}),closeErase:set({eraseOpen:false}),eraseCount:s.transcripts.length,confirmErase:set({eraseOpen:false,transcripts:[],tab:'activity'})
+    };
+  }
+}
+</script>
+</body>
+</html>
