@@ -112,9 +112,10 @@ function Dictation({ config, choices, set }) {
       go. The words are cleaned up and typed where your cursor already was.</p>
 
     <${Card} icon="mic" title="Speech engine"
-      hint="The browser engine works the moment WinWhispr is installed and sends
-            audio to Microsoft's speech service. The local model keeps everything
-            on this machine, after a one-time download.">
+      hint="The browser engine needs no download and works straight away, but it
+            sends audio to Microsoft's speech service and needs an internet
+            connection. The local model works with no network at all and keeps
+            every word on this machine, after a one-time download.">
       <div class="grid">
         <${Field} label="Engine" id="engine">
           <${Select} id="engine" value=${config.speech_engine}
