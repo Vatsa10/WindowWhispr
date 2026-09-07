@@ -25,6 +25,23 @@ const token = new URLSearchParams(location.search).get("token")
   || "";
 if (token) localStorage.setItem("winwhispr-token", token);
 
+// The native bridge is optional. pywebview injects `window.pywebview.api`
+// only once the window is bound, and a build without a method simply does not
+// have it -- neither may take the UI down, so every call goes through here.
+function bridge(method, ...args) {
+  const api = window.pywebview && window.pywebview.api;
+  const fn = api && api[method];
+  if (typeof fn !== "function") return false;
+  try {
+    const result = fn.apply(api, args);
+    // pywebview returns a promise; a rejection here is not the page's problem.
+    if (result && typeof result.catch === "function") result.catch(() => {});
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function post(path, body) {
   const headers = { "Content-Type": "application/json" };
   if (token) headers["X-WinWhispr-Token"] = token;
@@ -169,10 +186,7 @@ function useRecognizer({ onStatus, onSize }) {
       const message = JSON.parse(event.data);
       // The tray asks for the settings window through here, because the
       // windows live in this process rather than the one with the tray icon.
-      if (message.open_app) {
-        window.pywebview?.api?.open_app(location.origin + "/app");
-        return;
-      }
+      if (message.open_app) return void bridge("open_app", location.origin + "/app");
       const next = !!message.listening;
       if (next === want.current) return;
       want.current = next;
@@ -216,13 +230,11 @@ function Pill() {
     setStatus({ kind, label, detail });
   }, []);
 
-  // The host process owns the geometry; the page only names a state.
-  const onSize = useCallback((next) => {
-    setSizeState((current) => {
-      if (current !== next) window.pywebview?.api?.set_size(next);
-      return next;
-    });
-  }, []);
+  // Naming a state is all the page does. Telling the host to resize is a side
+  // effect, so it belongs in an effect -- React runs a state updater during
+  // render, and a throw in there unmounts the whole tree rather than failing
+  // the one call.
+  const onSize = useCallback((next) => setSizeState(next), []);
 
   const { needsArming, arm, supported } = useRecognizer({ onStatus, onSize });
 
@@ -233,6 +245,9 @@ function Pill() {
       onStatus("idle", "Not armed", "Tap once to allow the microphone.");
     }
   }, [supported, needsArming, onStatus]);
+
+  // The host process owns the geometry; this is the one place that tells it.
+  useEffect(() => { bridge("set_size", size); }, [size]);
 
   // The body carries both states: the pill's offset shadow changes colour with
   // status, and the idle size hides the second line.
@@ -260,7 +275,7 @@ function Pill() {
   if (menuOpen) {
     return html`<div class="overlay menu">
       <button class="quit" type="button"
-        onClick=${() => window.pywebview?.api?.quit()}>Quit WinWhispr</button>
+        onClick=${() => bridge("quit")}>Quit WinWhispr</button>
       <button type="button" onClick=${closeMenu}>Keep running</button>
     </div>`;
   }
@@ -272,7 +287,7 @@ function Pill() {
   }
 
   return html`<div class="pill"
-    onDoubleClick=${() => window.pywebview?.api?.open_app(location.origin + "/app")}>
+    onDoubleClick=${() => bridge("open_app", location.origin + "/app")}>
     <span class=${"dot " + status.kind}></span>
     <div class="lines">
       <div class="state">${status.label}</div>
