@@ -9,8 +9,9 @@
 </head>
 <body>
 <div id="root"></div>
-<!-- Vendored, not from a CDN: this app has to work on a laptop with no
-     internet, where a CDN script is a blank window. UMD builds, so they must
+<!-- Vendored, not from a CDN. The local speech engine works with no network,
+     and this window is where you switch to it, so a CDN would leave the
+     settings screen blank exactly when it is needed. UMD builds, so they must
      load before the module that wraps them. -->
 <script src="/static/vendor/react.js"></script>
 <script src="/static/vendor/react-dom.js"></script>

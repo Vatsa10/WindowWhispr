@@ -5,8 +5,11 @@
  * exception to "dark only" is that the palette is still defined on :root so a
  * light variant is a token swap rather than a rewrite.
  *
- * Font and script are vendored, not linked: this app has to work on a laptop
- * with no internet, and a webfont from a CDN would be a blank screen there.
+ * Font and script are vendored, not linked. Not because the whole app is
+ * offline -- the browser engine sends audio to a cloud speech service and
+ * needs a connection -- but because the LOCAL engine does not, and this window
+ * is where you switch to it. A CDN would make the settings screen blank on a
+ * plane, which is exactly when someone needs to change engines.
  */
 
 @font-face {

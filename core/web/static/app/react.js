@@ -2,9 +2,9 @@
 //
 // The vendored builds are UMD and define globals; this wraps them so the rest
 // of the app can import rather than reach for `window.React`. htm gives JSX
-// syntax without a build step, which is the whole reason this app has no Node
-// toolchain in it: one fewer thing to install, and one fewer thing that can be
-// out of date at packaging time.
+// syntax without a build step, which is why this app has no Node toolchain in
+// it: one fewer thing to install, and one fewer thing that can be out of date
+// at packaging time.
 
 const React = window.React;
 const ReactDOM = window.ReactDOM;
