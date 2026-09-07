@@ -1,118 +1,180 @@
 /* Same palette as the desktop window, sized for a phone held one-handed. */
 
 :root {
+  /* Color */
   --bg: #0a0c12;
   --surface: #111420;
   --surface2: #161a28;
   --border: #232a3d;
   --text: #eef1f8;
-  --muted: #7a8199;
+  --text-muted: #7a8199;
   --accent: #7c5cff;
   --accent2: #22d3ee;
   --danger: #f87171;
+  --on-accent: #0a0c12;
+
+  /* Spacing, 4px rhythm */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+  --sp-12: 48px;
+
+  /* Radius */
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+
+  /* Type scale */
+  --fs-xs: 12px;
+  --fs-sm: 14px;
+  --fs-md: 16px;
+  --fs-lg: 18px;
+  --fs-xl: 24px;
+  --fs-2xl: 32px;
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --dur: 180ms;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f4f5f9;
+    --surface: #ffffff;
+    --surface2: #eceefa;
+    --border: #d9dcea;
+    --text: #171a26;
+    --text-muted: #5c6178;
+    --accent: #6a45f0;
+    --accent2: #0891a8;
+    --danger: #c8372d;
+    --on-accent: #ffffff;
+  }
 }
 
 * { box-sizing: border-box; }
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
 
 body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font: 16px/1.5 "Segoe UI", system-ui, -apple-system, sans-serif;
-  min-height: 100dvh;
+  font: var(--fs-md)/1.5 "Segoe UI", system-ui, -apple-system, sans-serif;
 }
 
-main {
-  max-width: 640px;
+.page {
+  max-width: 34rem;
   margin: 0 auto;
-  padding: max(20px, env(safe-area-inset-top)) 20px
-           max(20px, env(safe-area-inset-bottom));
+  min-height: 100dvh;
+  padding: max(var(--sp-6), env(safe-area-inset-top)) var(--sp-6)
+           max(var(--sp-6), env(safe-area-inset-bottom))
+           max(var(--sp-6), env(safe-area-inset-left));
+  padding-right: max(var(--sp-6), env(safe-area-inset-right));
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: var(--sp-6);
 }
 
-header {
+.app-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--sp-3);
 }
 
-.brand { display: flex; align-items: center; gap: 12px; }
+main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.brand { display: flex; align-items: center; gap: var(--sp-3); }
 
 .mark {
   width: 34px;
   height: 34px;
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   background: linear-gradient(135deg, var(--accent), var(--accent2));
   flex: none;
 }
 
-h1 { font-size: 17px; margin: 0; font-weight: 600; }
-.engine { margin: 0; font-size: 12px; color: var(--muted); }
+h1 { font-size: var(--fs-lg); margin: 0; font-weight: 600; }
+.engine { margin: 0; font-size: var(--fs-xs); color: var(--text-muted); }
 
-/* The talk button is the whole interface, so it gets the room. */
+/* The talk button is the whole interface, so it gets the room and stays the
+   only filled accent surface on the page. */
 .talk {
   appearance: none;
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text);
-  border-radius: 20px;
-  padding: 28px 20px;
-  min-height: 160px;
+  border-radius: var(--radius-lg);
+  padding: var(--sp-8) var(--sp-6);
+  min-height: 180px;
+  width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 18px;
+  gap: var(--sp-4);
   cursor: pointer;
-  transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1),
-              border-color 160ms ease, background 160ms ease;
+  transition: transform var(--dur) var(--ease-out),
+              border-color var(--dur) ease,
+              background var(--dur) ease,
+              box-shadow var(--dur) ease;
 }
 
-.talk:active { transform: scale(0.985); }
+.talk:hover { border-color: var(--accent); }
+.talk:active { transform: scale(0.98); }
 
-.talk.live {
+.talk-icon { color: var(--text-muted); transition: color var(--dur) ease; }
+
+.talk[aria-pressed="true"] {
   border-color: var(--accent);
   background: linear-gradient(180deg, var(--surface2), var(--surface));
+  box-shadow: 0 0 0 1px var(--accent) inset;
 }
 
+.talk[aria-pressed="true"] .talk-icon { color: var(--accent2); }
+
 .talk-label {
-  font-size: 15px;
-  color: var(--muted);
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
   text-align: center;
   min-height: 1.5em;
   overflow-wrap: anywhere;
 }
 
-.talk.live .talk-label { color: var(--text); }
+.talk[aria-pressed="true"] .talk-label { color: var(--text); }
 
 .waveform {
-  display: flex;
-  align-items: center;
-  gap: 5px;
+  display: block;
+  width: 220px;
+  max-width: 100%;
   height: 44px;
 }
 
-.waveform i {
-  display: block;
-  width: 4px;
-  height: 100%;
-  border-radius: 2px;
-  background: linear-gradient(180deg, var(--accent), var(--accent2));
-  transform: scaleY(0.12);
-  transform-origin: center;
-  transition: transform 90ms ease-out;
-}
-
-.field { display: flex; flex-direction: column; gap: 8px; }
+.field { display: flex; flex-direction: column; gap: var(--sp-2); }
 
 .field-label {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--text-muted);
 }
 
 textarea {
@@ -120,60 +182,76 @@ textarea {
   background: var(--surface);
   color: var(--text);
   border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 14px;
+  border-radius: var(--radius-md);
+  padding: var(--sp-4);
   font: inherit;
   resize: vertical;
 }
 
-textarea:focus, .talk:focus-visible, button:focus-visible {
+/* :focus-visible rings on every interactive element; never removed. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+.toggle:focus-within {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
-.actions { display: flex; gap: 10px; }
+.actions {
+  display: flex;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+}
+
+.ghost,
+.primary {
+  appearance: none;
+  border-radius: var(--radius-sm);
+  padding: var(--sp-3) var(--sp-4);
+  font: inherit;
+  min-height: 44px;
+  min-width: 44px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  transition: transform var(--dur) var(--ease-out), background var(--dur) ease;
+}
 
 .ghost {
-  appearance: none;
   border: 1px solid var(--border);
   background: transparent;
   color: var(--text);
-  border-radius: 10px;
-  padding: 10px 16px;
-  font: inherit;
-  min-height: 44px;
-  cursor: pointer;
-  transition: transform 140ms cubic-bezier(0.23, 1, 0.32, 1), background 140ms ease;
 }
 
 .ghost:hover { background: var(--surface2); }
 .ghost:active { transform: scale(0.97); }
 
-.status { margin: 0; min-height: 1.4em; font-size: 13px; color: var(--muted); }
+.status { margin: 0; min-height: 1.4em; font-size: var(--fs-sm); color: var(--text-muted); }
 .status.error { color: var(--danger); }
-
-@media (prefers-reduced-motion: reduce) {
-  .waveform i, .talk, .ghost { transition: none; }
-}
 
 /* Toggles: big enough to hit with a thumb while holding the phone. */
 .toggles {
   display: flex;
-  gap: 10px;
+  gap: var(--sp-3);
   flex-wrap: wrap;
+  border: none;
+  padding: 0;
+  margin: 0;
 }
 
 .toggle {
   display: flex;
   align-items: center;
-  gap: 9px;
-  padding: 10px 14px;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4);
   min-height: 44px;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-sm);
   background: var(--surface);
-  font-size: 14px;
-  color: var(--muted);
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
   cursor: pointer;
   user-select: none;
 }
@@ -182,19 +260,18 @@ textarea:focus, .talk:focus-visible, button:focus-visible {
 .toggle:has(input:checked) { color: var(--text); border-color: var(--accent); }
 
 .primary {
-  appearance: none;
   border: none;
-  border-radius: 10px;
-  padding: 10px 18px;
-  min-height: 44px;
-  font: inherit;
   font-weight: 600;
-  color: #0a0c12;
+  color: var(--on-accent);
   background: linear-gradient(135deg, var(--accent2), var(--accent));
-  cursor: pointer;
-  transition: transform 140ms cubic-bezier(0.23, 1, 0.32, 1);
 }
 
 .primary:active { transform: scale(0.97); }
 
 .talk[disabled] { opacity: 0.5; cursor: not-allowed; }
+
+@media (prefers-reduced-motion: reduce) {
+  .talk, .ghost, .primary, .talk-icon {
+    transition: none;
+  }
+}
