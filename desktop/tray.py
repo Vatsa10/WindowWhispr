@@ -56,14 +56,30 @@ class TrayApp:
     # -- menu -------------------------------------------------------------
 
     def _menu(self) -> QMenu:
+        """The right-click menu.
+
+        Every part of it is kept on ``self``. A QMenu built as a local and
+        handed to setContextMenu is owned by nothing on the Python side, so it
+        is garbage collected the moment this returns and right-clicking the
+        tray icon does nothing at all.
+        """
         menu = QMenu()
-        self._open_action = QAction("Open WinWhispr")
+
+        self._open_action = QAction("Open WinWhispr", menu)
         self._open_action.triggered.connect(self.open_window)
         menu.addAction(self._open_action)
+
+        self._restart_action = QAction("Restart dictation", menu)
+        self._restart_action.triggered.connect(self.start_engine)
+        menu.addAction(self._restart_action)
+
         menu.addSeparator()
-        quit_action = QAction("Quit")
-        quit_action.triggered.connect(self.quit)
-        menu.addAction(quit_action)
+
+        self._quit_action = QAction("Quit WinWhispr", menu)
+        self._quit_action.triggered.connect(self.quit)
+        menu.addAction(self._quit_action)
+
+        self._tray_menu = menu
         return menu
 
     def _on_tray_activated(self, reason) -> None:

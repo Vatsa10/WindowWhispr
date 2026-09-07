@@ -58,6 +58,11 @@ APP_OPS = {
 }
 STATIC_DIR = Path(__file__).parent / "static"
 
+# Python's table has no woff2 on a stock Windows install, and a font served as
+# octet-stream is refused by some strict configurations.
+mimetypes.add_type("font/woff2", ".woff2")
+mimetypes.add_type("text/javascript", ".js")
+
 #: Refuse audio larger than this. The page sends one utterance at a time; a
 #: bigger body is a mistake or an attack, and decoding it would cost real
 #: memory on the dictating machine.

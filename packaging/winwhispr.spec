@@ -133,7 +133,6 @@ _hiddenimports += [
     "database.db_manager",
     "database.migrations",
     "core.audio_meter",
-    "desktop.main_window",
     "desktop.pill",
     "desktop.theme",
     "desktop.waveform",
