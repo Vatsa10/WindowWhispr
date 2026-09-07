@@ -54,7 +54,7 @@ def test_resizing_to_the_same_state_does_nothing():
         move = staticmethod(lambda x, y: calls.append(("move", x, y)))
 
     api = Api()
-    api.window = FakeWindow()
+    api.bind(FakeWindow(), (1920, 1080))
     api.set_size("live")
     api.set_size("live")
     assert [c[0] for c in calls] == ["resize", "move"]
@@ -69,7 +69,7 @@ def test_an_unknown_state_is_ignored():
             raise AssertionError("should not move")
 
     api = Api()
-    api.window = Boom()
+    api.bind(Boom(), (1920, 1080))
     api.set_size("nonsense")
 
 

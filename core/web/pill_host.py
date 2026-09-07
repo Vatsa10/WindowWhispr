@@ -52,23 +52,30 @@ class Api:
     """
 
     def __init__(self) -> None:
-        self.window = None
-        self.screen = (1920, 1080)
+        # Underscored on purpose: pywebview exposes the public surface of this
+        # object to JavaScript and walks what it finds, and walking a Window
+        # recurses through its native widget tree until the stack gives out.
+        self._window = None
+        self._screen = (1920, 1080)
         self._size = ""
+
+    def bind(self, window, screen: tuple[int, int]) -> None:
+        self._window = window
+        self._screen = screen
 
     def set_size(self, size: str) -> None:
         """Grow or shrink to the size for a state."""
-        if self.window is None or size == self._size or size not in SIZES:
+        if self._window is None or size == self._size or size not in SIZES:
             return
         self._size = size
         width, height = SIZES[size]
-        x, y = place(*self.screen, size=size)
-        self.window.resize(width, height)
-        self.window.move(x, y)
+        x, y = place(*self._screen, size=size)
+        self._window.resize(width, height)
+        self._window.move(x, y)
 
     def quit(self) -> None:
-        if self.window is not None:
-            self.window.destroy()
+        if self._window is not None:
+            self._window.destroy()
 
 
 def run(url: str) -> None:
@@ -80,11 +87,10 @@ def run(url: str) -> None:
     height = getattr(screen, "height", 1080)
 
     api = Api()
-    api.screen = (width, height)
     x, y = place(width, height, "arm")
     start_w, start_h = SIZES["arm"]
 
-    api.window = webview.create_window(
+    window = webview.create_window(
         "WinWhispr",
         url,
         js_api=api,
@@ -100,6 +106,7 @@ def run(url: str) -> None:
         # An opaque window the same colour as the pill has neither problem.
         background_color="#12151F",
     )
+    api.bind(window, (width, height))
     # private_mode off: the microphone grant has to survive a restart, or the
     # user re-approves the mic every time the app starts.
     webview.start(private_mode=False, storage_path=_storage_path())
