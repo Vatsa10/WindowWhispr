@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0c12">
+<title>WinWhispr</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<main>
+  <header>
+    <div class="brand">
+      <span class="mark" aria-hidden="true"></span>
+      <div>
+        <h1>WinWhispr</h1>
+        <p class="engine" id="engine">checking...</p>
+      </div>
+    </div>
+  </header>
+
+  <button id="talk" class="talk" aria-live="polite">
+    <span class="waveform" id="waveform" aria-hidden="true"></span>
+    <span class="talk-label" id="talk-label">Tap to talk</span>
+  </button>
+
+  <div class="toggles">
+    <label class="toggle">
+      <input type="checkbox" id="continuous" checked>
+      <span>Keep listening</span>
+    </label>
+    <label class="toggle" id="autosend-wrap" hidden>
+      <input type="checkbox" id="autosend">
+      <span>Type on PC</span>
+    </label>
+  </div>
+
+  <p class="status" id="status" role="status"></p>
+
+  <label class="field">
+    <span class="field-label">Transcript</span>
+    <textarea id="text" rows="9" placeholder="Your words appear here. Speak, pause, and they arrive."></textarea>
+  </label>
+
+  <div class="actions">
+    <button id="send" class="primary" hidden>Send to PC</button>
+    <button id="copy" class="ghost">Copy</button>
+    <button id="clear" class="ghost">Clear</button>
+  </div>
+</main>
+<script type="module" src="/static/ui.js"></script>
+</body>
+</html>

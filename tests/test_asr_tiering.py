@@ -105,3 +105,15 @@ def test_budget_is_measured_against_the_tail_not_the_whole_utterance():
     # The point of the design: a long dictation must not cost more at release.
     assert TAIL_SECONDS <= 2.0
     assert LATENCY_BUDGET_MS <= 300
+
+
+def test_the_automatic_registry_entry_is_recognized_as_auto():
+    """The settings dropdown stores a display name, not the word "auto".
+
+    Matching only the literal string sent "Automatic (recommended)" down the
+    explicit path, where its id "auto" was handed to Whisper as a model name.
+    """
+    from core.asr import AUTO
+    from core.model_registry import DEFAULT_MODEL_DISPLAY, resolve_model_id
+
+    assert resolve_model_id(DEFAULT_MODEL_DISPLAY) == AUTO

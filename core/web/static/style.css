@@ -1,0 +1,200 @@
+/* Same palette as the desktop window, sized for a phone held one-handed. */
+
+:root {
+  --bg: #0a0c12;
+  --surface: #111420;
+  --surface2: #161a28;
+  --border: #232a3d;
+  --text: #eef1f8;
+  --muted: #7a8199;
+  --accent: #7c5cff;
+  --accent2: #22d3ee;
+  --danger: #f87171;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.5 "Segoe UI", system-ui, -apple-system, sans-serif;
+  min-height: 100dvh;
+}
+
+main {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: max(20px, env(safe-area-inset-top)) 20px
+           max(20px, env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.brand { display: flex; align-items: center; gap: 12px; }
+
+.mark {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  flex: none;
+}
+
+h1 { font-size: 17px; margin: 0; font-weight: 600; }
+.engine { margin: 0; font-size: 12px; color: var(--muted); }
+
+/* The talk button is the whole interface, so it gets the room. */
+.talk {
+  appearance: none;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 20px;
+  padding: 28px 20px;
+  min-height: 160px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  cursor: pointer;
+  transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1),
+              border-color 160ms ease, background 160ms ease;
+}
+
+.talk:active { transform: scale(0.985); }
+
+.talk.live {
+  border-color: var(--accent);
+  background: linear-gradient(180deg, var(--surface2), var(--surface));
+}
+
+.talk-label {
+  font-size: 15px;
+  color: var(--muted);
+  text-align: center;
+  min-height: 1.5em;
+  overflow-wrap: anywhere;
+}
+
+.talk.live .talk-label { color: var(--text); }
+
+.waveform {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 44px;
+}
+
+.waveform i {
+  display: block;
+  width: 4px;
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--accent), var(--accent2));
+  transform: scaleY(0.12);
+  transform-origin: center;
+  transition: transform 90ms ease-out;
+}
+
+.field { display: flex; flex-direction: column; gap: 8px; }
+
+.field-label {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+textarea {
+  width: 100%;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px;
+  font: inherit;
+  resize: vertical;
+}
+
+textarea:focus, .talk:focus-visible, button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.actions { display: flex; gap: 10px; }
+
+.ghost {
+  appearance: none;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  border-radius: 10px;
+  padding: 10px 16px;
+  font: inherit;
+  min-height: 44px;
+  cursor: pointer;
+  transition: transform 140ms cubic-bezier(0.23, 1, 0.32, 1), background 140ms ease;
+}
+
+.ghost:hover { background: var(--surface2); }
+.ghost:active { transform: scale(0.97); }
+
+.status { margin: 0; min-height: 1.4em; font-size: 13px; color: var(--muted); }
+.status.error { color: var(--danger); }
+
+@media (prefers-reduced-motion: reduce) {
+  .waveform i, .talk, .ghost { transition: none; }
+}
+
+/* Toggles: big enough to hit with a thumb while holding the phone. */
+.toggles {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 14px;
+  min-height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  font-size: 14px;
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.toggle input { width: 18px; height: 18px; accent-color: var(--accent); }
+.toggle:has(input:checked) { color: var(--text); border-color: var(--accent); }
+
+.primary {
+  appearance: none;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 18px;
+  min-height: 44px;
+  font: inherit;
+  font-weight: 600;
+  color: #0a0c12;
+  background: linear-gradient(135deg, var(--accent2), var(--accent));
+  cursor: pointer;
+  transition: transform 140ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.primary:active { transform: scale(0.97); }
+
+.talk[disabled] { opacity: 0.5; cursor: not-allowed; }

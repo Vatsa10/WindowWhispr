@@ -41,11 +41,15 @@ def build_engine(model_display_name: str, device: str = "auto", log=print):
     """
     from core.model_registry import resolve_backend, resolve_model_id
 
-    if model_display_name.strip().lower() == AUTO:
-        return _build_auto(log=log)
-
     backend = resolve_backend(model_display_name)
     model_id = resolve_model_id(model_display_name)
+
+    # Both spellings mean the same thing: the literal "auto", and the registry
+    # entry whose id is "auto" (what the settings dropdown stores). Checking
+    # only the display name let "Automatic (recommended)" fall through and be
+    # handed to Whisper as if "auto" were a model name.
+    if AUTO in (model_display_name.strip().lower(), str(model_id).strip().lower()):
+        return _build_auto(log=log)
 
     if backend == "faster_whisper":
         from core.asr.faster_whisper_engine import FasterWhisperEngine

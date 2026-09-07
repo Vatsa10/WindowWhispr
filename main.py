@@ -7,6 +7,7 @@ which also runs the background dictation engine (global hotkey + ASR).
     python main.py headless   # engine only, no window (global hotkey)
     python main.py setup      # download + optimize models, then exit
     python main.py models     # what is on disk, and how to reclaim it
+    python main.py web        # dictate from a browser, phone included
 """
 
 import sys
@@ -104,6 +105,35 @@ def setup():
     print("[WinWhispr][setup] Done.")
 
 
+def web():
+    """Serve the browser front end.
+
+        python main.py web                      # localhost only
+        python main.py web --lan                # reachable from your phone
+        python main.py web --allow-paste        # type into the focused window
+        python main.py web --port 9000
+
+    --lan generates an access token, because the paste route types into this
+    machine and a private network is not the same thing as a trusted one.
+    """
+    import secrets as _secrets
+
+    from core.web import DEFAULT_PORT, serve
+
+    args = sys.argv[2:]
+    lan = "--lan" in args
+    allow_paste = "--allow-paste" in args
+    port = DEFAULT_PORT
+    if "--port" in args:
+        index = args.index("--port")
+        if index + 1 < len(args):
+            port = int(args[index + 1])
+
+    host = "0.0.0.0" if lan else "127.0.0.1"
+    token = _secrets.token_urlsafe(16) if lan else ""
+    serve(host=host, port=port, allow_paste=allow_paste, token=token)
+
+
 def models():
     """List downloaded models and their disk usage, or delete one.
 
@@ -152,5 +182,7 @@ if __name__ == "__main__":
         setup()
     elif mode == "models":
         models()
+    elif mode == "web":
+        web()
     else:
         main()

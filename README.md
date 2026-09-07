@@ -1,12 +1,17 @@
 # WinWhispr
 
-WinWhispr is an offline, Windows background dictation app that produces real-time
-transcriptions. It runs as a native PySide6 desktop
-app that lives in the system tray and types recognized speech into whatever app
-currently has focus.
+WinWhispr is offline dictation for Windows. Hold a key, speak, and your words
+are typed into whatever application has focus.
 
-> Native, not browser-based — see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
-> for the internal design.
+It comes two ways:
+
+- **A desktop app** that lives in the system tray, transcribing on this machine
+  with Whisper. Nothing leaves the computer.
+- **A browser page** you can open from your phone or another laptop, which uses
+  the browser's own speech engine where it has one. See
+  [Dictate from a browser](#dictate-from-a-browser).
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the internal design.
 
 ## Features
 
@@ -21,9 +26,10 @@ currently has focus.
   something goes wrong.
 - Microphone capture at 16 kHz, mono, `float32`.
 - Voice-activity chunking with **Silero VAD** (ONNX).
-- **Speech-to-text your choice of two ways**: **Groq Whisper large-v3** (default
-  — nothing to download, one request per dictation) or fully local **OpenVINO**
-  models running in-process. See [Supported models](#supported-models).
+- **Speech-to-text sized to your machine.** The default inspects the hardware
+  and picks a local Whisper model, then measures it and drops to a smaller one
+  if it is too slow. Cloud (Groq) is available but off by default. See
+  [Supported models](#supported-models).
 - **Automatic cleanup** of the finished transcript by a local LLM: fillers gone,
   spoken self-corrections resolved ("meet at 2, actually 3" → "3"), spoken
   punctuation and lists applied, tone matched to the app you are typing into.
@@ -47,6 +53,38 @@ currently has focus.
   nothing leaves the machine after the one-time model download.
 - **Reset all data** button in the sidebar to wipe usage metrics and the
   activity log.
+
+## Dictate from a browser
+
+```powershell
+uv run python main.py web              # this machine only
+uv run python main.py web --lan        # reachable from your phone
+uv run python main.py web --lan --allow-paste
+```
+
+Open the printed address. One button: tap, talk, pause. The words appear.
+
+**Chrome, Edge and Safari transcribe in the browser itself** — their speech
+engine returns a transcript the instant you stop talking, with nothing to
+download and no model running on your PC. That is the fast path, and it is the
+default wherever the browser provides it. Firefox has no such engine, so the
+page records, detects the pause itself, and sends one WAV to the Whisper model
+already running on your PC. Either way the audio stays on your network.
+
+The transcript then goes through the same cleanup the desktop app uses: fillers
+and stutters gone, spoken punctuation applied, sentences capitalized, snippets
+expanded.
+
+Two switches on the page:
+
+- **Keep listening** — after each pause it re-arms, so a pause to think does not
+  end the session. On by default.
+- **Type on PC** — every finished sentence is typed into whatever window has
+  focus on the PC. Dictate from the sofa, watch it land in the document.
+  Requires `--allow-paste`.
+
+`--lan` prints an access token, and the page asks for it once. That route types
+into your machine, so a private network is not treated as a trusted one.
 
 ## How to use
 
@@ -86,9 +124,8 @@ under `%USERPROFILE%\.cache\winwhispr`.
 
 ## Cloud (Groq)
 
-The default speech-to-text model runs on **Groq** — no multi-gigabyte download,
-and `whisper-large-v3` is more accurate than anything that fits comfortably on a
-laptop. You need a free [Groq API key](https://console.groq.com/keys).
+Speech-to-text runs locally by default. Groq is there for machines too slow for
+a local model, and needs a free [Groq API key](https://console.groq.com/keys).
 
 Paste it into the **Cloud (Groq)** section of the sidebar. It goes into
 **Windows Credential Manager**, never into `config.json`. For development, the
@@ -110,11 +147,15 @@ Local models are pre-optimized **OpenVINO IR** and download on first run (or via
 
 ### Speech-to-text (ASR)
 
-| Display name            | Registry ID                                  | Runs on |
-| ----------------------- | -------------------------------------------- | ------- |
-| `Groq Whisper Large v3` | `whisper-large-v3`                           | Groq (default) |
-| `Cohere-transcribe`     | `Aditya02/cohere-transcribe-03-2026-ov-fp16` | This machine, FP16 |
-| `Whisper Large`         | `OpenVINO/whisper-large-v3-int4-ov`          | This machine, INT4 |
+| Display name                 | Runs on | Notes |
+| ---------------------------- | ------- | ----- |
+| `Automatic (recommended)`    | This machine | **Default.** Picks a model to fit the hardware, then verifies it by measurement |
+| `Whisper Base (local, fast)` | This machine | ~380ms per utterance on a modern CPU |
+| `Whisper Small (local, accurate)` | This machine | ~1.2s, better on names |
+| `Whisper Tiny (local, fastest)`   | This machine | ~190ms, weakest on proper nouns |
+| `Groq Whisper Turbo`         | Groq | Needs an API key; the transcript leaves the machine |
+| `Cohere-transcribe`          | This machine | OpenVINO FP16, 4.4 GB |
+| `Whisper Large`              | This machine | OpenVINO INT4 |
 
 ### Clipboard reformatter (LLM)
 

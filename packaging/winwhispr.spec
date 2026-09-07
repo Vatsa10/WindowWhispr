@@ -91,6 +91,10 @@ _hiddenimports += [
     "core.asr.probe",
     "core.asr.remote_engine",
     "core.asr.tiering",
+    "core.web",
+    "core.web.server",
+    "core.web.paste",
+    "core.model_store",
     "faster_whisper",
     "ctranslate2",
     "core.autostart",
@@ -132,7 +136,13 @@ a = Analysis(
     [os.path.join(_ROOT, "main.py")],
     pathex=[_ROOT],
     binaries=_binaries,
-    datas=_datas + [(os.path.join(_ROOT, "assets"), "assets")],
+    datas=_datas + [
+        (os.path.join(_ROOT, "assets"), "assets"),
+        # The browser front end is served from disk at runtime, so its
+        # static files have to travel with the executable.
+        (os.path.join(_ROOT, "core", "web", "static"),
+         os.path.join("core", "web", "static")),
+    ],
     hiddenimports=_hiddenimports,
     hookspath=[],
     hooksconfig={},
