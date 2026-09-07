@@ -39,8 +39,13 @@ function onLevel(level) {
 
 let listener = null;
 let session = false;   // the user wants to dictate; survives individual takes
+let running = false;   // a session is actually in flight, including the tail
+                        // end of a take (upload/tidy/send) after stop() was
+                        // called — the click handler must not race this.
 let statusClearTimer = 0;
 let copyResetTimer = 0;
+let noEngine = false;  // no speech engine at all: the talk button must stay
+                        // disabled no matter what else touches setTalkBusy.
 
 // --- persisted toggles -------------------------------------------------
 
@@ -77,7 +82,9 @@ function setTalkState(listening) {
 }
 
 function setTalkBusy(busy) {
-  talk.disabled = busy;
+  // A missing speech engine disables the button for good; nothing done
+  // mid-session should be able to re-enable it.
+  talk.disabled = noEngine ? true : busy;
 }
 
 // --- transcript ------------------------------------------------------
@@ -89,21 +96,23 @@ function append(transcript) {
   text.scrollTop = text.scrollHeight;
 }
 
-async function tidy(raw) {
+async function tidy(raw, tokenPrompted) {
   // The same rules the desktop app applies: fillers, stutters, spoken
   // punctuation, capitalization, snippets. Failure returns the raw words.
   const res = await api("/api/tidy", { text: raw });
   if (res?.error === "unauthorized") {
-    askForToken();
+    if (!tokenPrompted.done) askForToken();
+    tokenPrompted.done = true;
     return raw;
   }
   return res && res.text ? res.text : raw;
 }
 
-async function sendToPc(body) {
+async function sendToPc(body, tokenPrompted) {
   const res = await api("/api/paste", { text: body });
   if (res?.error === "unauthorized") {
-    askForToken();
+    if (!tokenPrompted?.done) askForToken();
+    if (tokenPrompted) tokenPrompted.done = true;
     return false;
   }
   if (res?.error) {
@@ -135,7 +144,7 @@ function askForToken() {
 // the session alive so a pause to think does not mean pressing the button
 // again.
 
-async function runTake() {
+async function runTake(tokenPrompted) {
   listener = createListener();
   setTalkState(true);
   talkLabel.textContent = "Listening...";
@@ -150,7 +159,14 @@ async function runTake() {
     onPhase: (phase) => {
       if (phase === "thinking") talkLabel.textContent = "Transcribing...";
     },
-    onError: (message) => setStatus(message + " Tap the mic to try again.", "error"),
+    onError: (message) => {
+      if (message === "unauthorized") {
+        if (!tokenPrompted.done) askForToken();
+        tokenPrompted.done = true;
+        return;
+      }
+      setStatus(message + " Tap the mic to try again.", "error");
+    },
   });
 
   onLevel(0);
@@ -158,12 +174,16 @@ async function runTake() {
 }
 
 async function runSession() {
+  if (running) return;   // a previous take is still winding down (upload,
+                          // tidy, send) — do not open a second microphone.
+  running = true;
   session = true;
   setStatus("");
 
   try {
     while (session) {
-      const result = await runTake();
+      const tokenPrompted = { done: false };
+      const result = await runTake(tokenPrompted);
 
       if (result === null) break;            // cancelled, or already reported
       if (result === "") {
@@ -174,25 +194,34 @@ async function runSession() {
         continue;                            // silence: just listen again
       }
 
+      // The user may have tapped stop while this take was still uploading
+      // or transcribing. Keep the words they actually spoke — losing them
+      // would be more surprising than adding one more line — but treat the
+      // session as over: no auto-send, no re-arming for another take.
+      const stoppedMidTake = !session;
+
       setTalkBusy(true);
       try {
-        const cleaned = await tidy(result);
+        const cleaned = await tidy(result, tokenPrompted);
         append(cleaned);
 
-        if (autosendBox.checked && !autosendWrap.hidden) {
-          const sent = await sendToPc(cleaned);
-          setStatus(sent ? "Typed on the PC." : "");
+        if (!stoppedMidTake && autosendBox.checked && !autosendWrap.hidden) {
+          const sent = await sendToPc(cleaned, tokenPrompted);
+          // On failure sendToPc has already set an explanatory error status;
+          // don't clobber it with a generic success announcement.
+          if (sent) setStatus("Typed on the PC.");
         } else {
-          setStatus("");
+          setStatus("Transcript added.");
         }
       } finally {
         setTalkBusy(false);
       }
 
-      if (!continuousBox.checked) break;
+      if (stoppedMidTake || !continuousBox.checked) break;
     }
   } finally {
     session = false;
+    running = false;
     setTalkState(false);
     setTalkBusy(false);
     talkLabel.textContent = "Tap to talk";
@@ -209,9 +238,29 @@ function stopSession() {
 // --- wiring ----------------------------------------------------------
 
 talk.addEventListener("click", () => {
-  if (talk.disabled) return;
-  if (session) stopSession();
-  else runSession();
+  if (running) {
+    // A session is live (including the tail end of a take after stop()),
+    // so this tap can only mean "stop", never "start a second session".
+    if (session) stopSession();
+    return;
+  }
+  runSession().catch((err) => {
+    // listen() can reject outright (e.g. AudioContext/MediaRecorder
+    // construction throwing) before onError ever fires. Without this the
+    // button would silently return to "Tap to talk" with no explanation
+    // and the mic possibly still open.
+    setStatus(
+      (err?.message || "Something went wrong starting the microphone.") +
+        " Tap the mic to try again.",
+      "error"
+    );
+    running = false;
+    session = false;
+    setTalkState(false);
+    setTalkBusy(false);
+    talkLabel.textContent = "Tap to talk";
+    waveformRenderer?.stop?.();
+  });
 });
 
 // Space toggles, the way a key does on the desktop — except while typing in
@@ -281,6 +330,7 @@ sendBtn.addEventListener("click", async () => {
     engineLabel.textContent = "Local Whisper on the PC - this browser has no speech engine";
   } else {
     engineLabel.textContent = "No speech engine available";
+    noEngine = true;
     talk.disabled = true;
   }
 })();

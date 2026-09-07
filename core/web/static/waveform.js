@@ -18,18 +18,18 @@ export function createWaveform(canvas) {
   let cssWidth = 0;
   let cssHeight = 0;
   let dpr = 1;
+  let cachedTokens = { accent: "currentColor", accent2: "currentColor" };
 
   // Per-bar phase offsets so the idle shimmer ripples instead of pulsing in
   // lockstep, and per-bar smoothed levels so a live signal doesn't jitter.
   const phases = Array.from({ length: BAR_COUNT }, (_, i) => (i / BAR_COUNT) * Math.PI * 2);
   const smoothed = new Array(BAR_COUNT).fill(IDLE_LEVEL);
 
-  function tokens() {
+  function readTokens() {
     const style = getComputedStyle(canvas);
-    return {
+    cachedTokens = {
       accent: style.getPropertyValue("--accent").trim() || "currentColor",
       accent2: style.getPropertyValue("--accent2").trim() || "currentColor",
-      muted: style.getPropertyValue("--text-muted").trim() || "currentColor",
     };
   }
 
@@ -41,6 +41,7 @@ export function createWaveform(canvas) {
     canvas.width = Math.max(1, Math.round(cssWidth * dpr));
     canvas.height = Math.max(1, Math.round(cssHeight * dpr));
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    readTokens();
   }
 
   function barHeights(t) {
@@ -58,7 +59,7 @@ export function createWaveform(canvas) {
   }
 
   function draw(t) {
-    const { accent, accent2 } = tokens();
+    const { accent, accent2 } = cachedTokens;
     ctx.clearRect(0, 0, cssWidth, cssHeight);
 
     const gap = cssWidth / BAR_COUNT;
