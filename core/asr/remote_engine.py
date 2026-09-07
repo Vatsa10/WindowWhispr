@@ -25,6 +25,13 @@ class GroqEngine:
     def warmup(self) -> None:
         """Nothing to load. The first request pays for DNS and TLS."""
 
+    def set_vocabulary(self, terms) -> None:
+        """Accepted and ignored: Groq's API takes no vocabulary hint.
+
+        Present so the pipeline can hand vocabulary to any engine without
+        asking which kind it is.
+        """
+
     def transcribe(self, audio) -> str:
         from core import secrets
         from core.groq_client import transcribe

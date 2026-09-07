@@ -65,7 +65,7 @@ from desktop.widgets import (
 
 _ICON_PNG = str(paths.asset_path("winwhispr.png"))
 
-_PIPELINE_KEYS = {"hotkey", "vad_threshold", "asr_model", "asr_device", "log_transcript", "min_silence_ms", "max_segment_seconds", "reformat_hotkey", "llm_model", "llm_device", "commit_mode", "cleanup_level", "cleanup_timeout_ms", "per_app_formatting", "cleanup_provider", "groq_cleanup_model", "ptt_enabled", "ptt_key", "cancel_key", "sound_on_start", "input_device", "paste_last_hotkey", "copy_last_hotkey", "autolearn_enabled", "hands_free_double_tap", "toggle_enabled"}
+_PIPELINE_KEYS = {"hotkey", "vad_threshold", "asr_model", "asr_device", "log_transcript", "min_silence_ms", "max_segment_seconds", "reformat_hotkey", "llm_model", "llm_device", "commit_mode", "cleanup_level", "cleanup_timeout_ms", "per_app_formatting", "cleanup_provider", "groq_cleanup_model", "ptt_enabled", "ptt_key", "cancel_key", "sound_on_start", "input_device", "paste_last_hotkey", "copy_last_hotkey", "autolearn_enabled", "hands_free_double_tap", "toggle_enabled", "keep_mic_open"}
 
 _log = logging.getLogger("winwhispr.gui")
 
@@ -1064,6 +1064,7 @@ class MainWindow(QMainWindow):
                     hands_free_double_tap=self._config.get("hands_free_double_tap", False),
                     toggle_enabled=self._config.get("toggle_enabled", False),
                     sound_on_start=self._config.get("sound_on_start", True),
+                    keep_mic_open=self._config.get("keep_mic_open", False),
                     paste_last_hotkey=self._config.get("paste_last_hotkey", "ctrl+alt+v"),
                     copy_last_hotkey=self._config.get("copy_last_hotkey", "ctrl+alt+c"),
                     input_device=self._config.get("input_device") or None,

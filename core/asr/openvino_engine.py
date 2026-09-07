@@ -39,5 +39,12 @@ class OpenVinoEngine:
             self._backend = OVASRBackend(model_dir, device=self._device)
         return self._backend
 
+    def set_vocabulary(self, terms) -> None:
+        """Accepted and ignored: The OpenVINO backends take no vocabulary hint.
+
+        Present so the pipeline can hand vocabulary to any engine without
+        asking which kind it is.
+        """
+
     def transcribe(self, audio) -> str:
         return self._ensure_backend().transcribe(audio)

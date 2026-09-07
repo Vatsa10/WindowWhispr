@@ -55,7 +55,19 @@ class LocalCleanupProvider:
         """Return cleaned text for the given message list."""
         raw = self._reformatter.generate(
             render_chatml(messages),
-            max_new_tokens=self._max_new_tokens,
+            max_new_tokens=self._budget(messages),
             apply_chat_template=False,
         )
         return strip_envelope(raw)
+
+    def _budget(self, messages) -> int:
+        """Token ceiling scaled to the utterance being cleaned.
+
+        Cleanup only ever rewrites what was said, so an output much longer than
+        the input is a model that has started rambling. Capping it bounds both
+        the damage and the latency — a small model asked for 400 tokens will
+        happily spend them.
+        """
+        spoken = messages[-1].content if messages else ""
+        words = len(spoken.split())
+        return max(64, min(self._max_new_tokens, words * 3 + 24))

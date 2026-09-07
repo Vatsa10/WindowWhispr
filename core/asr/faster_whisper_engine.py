@@ -16,6 +16,31 @@ from core.asr.tiering import ModelChoice, calibrate, cpu_fallback
 
 _log = logging.getLogger("winwhispr.asr")
 
+#: Primes the decoder for what this audio is. Whisper conditions on it, so
+#: telling it to expect dictation with proper nouns measurably helps names.
+ASR_PROMPT = (
+    "Accurate conversational dictation containing technical terms and proper nouns."
+)
+
+#: Peak level to normalize to before decoding. A quiet microphone produces a
+#: quiet waveform, and Whisper's accuracy falls off with level; scaling costs
+#: one pass over the samples and recovers that.
+TARGET_PEAK = 0.95
+
+
+def _normalize_peak(audio):
+    """Scale audio so its loudest sample sits near full scale.
+
+    Silence is returned untouched: dividing by a peak of zero is meaningless,
+    and amplifying room noise to full scale invents speech that was not there.
+    """
+    import numpy as np
+
+    peak = float(np.abs(audio).max()) if len(audio) else 0.0
+    if peak < 1e-4:
+        return audio
+    return (audio * (TARGET_PEAK / peak)).astype(np.float32, copy=False)
+
 
 class FasterWhisperEngine:
     """Local speech-to-text. Loads on first use, never on the hook thread."""
@@ -35,6 +60,8 @@ class FasterWhisperEngine:
         #: Set once a GPU failure has pushed this engine onto the CPU, so the
         #: fallback is attempted exactly once rather than on every utterance.
         self._degraded = False
+        #: Names and technical terms to bias decoding toward.
+        self._vocabulary: tuple[str, ...] = ()
         #: What one utterance cost at warmup, in milliseconds. 0 until measured.
         self.measured_ms = 0.0
         self.caps = EngineCaps(supports_pipelining=True, label=choice.label)
@@ -166,8 +193,31 @@ class FasterWhisperEngine:
             self._model = None
         self._ensure_model()
 
+    def set_vocabulary(self, terms) -> None:
+        """Names and jargon to bias decoding toward.
+
+        Whisper accepts vocabulary at decode time, which fixes a mis-heard name
+        at the source instead of asking a language model to repair it
+        afterwards. "ChargeBee" transcribed as "charge B" cannot be reliably
+        repaired later — the information is already gone.
+        """
+        self._vocabulary = tuple(dict.fromkeys(t.strip() for t in terms if t and t.strip()))
+
+    def _decode_options(self) -> dict:
+        if not self._vocabulary:
+            return {}
+        vocabulary = ", ".join(self._vocabulary)
+        return {
+            # initial_prompt primes the decoder's context; hotwords bias the
+            # search directly. They complement each other and Whisper accepts
+            # both.
+            "initial_prompt": f"{ASR_PROMPT} Relevant vocabulary: {vocabulary}.",
+            "hotwords": vocabulary,
+        }
+
     def _transcribe(self, audio) -> str:
         model = self._ensure_model()
+        audio = _normalize_peak(audio)
         # Greedy decoding, and no carry-over between segments: this app sends
         # short independent utterances, and previous-text conditioning is what
         # makes Whisper repeat itself when a segment is mostly silence.
@@ -177,5 +227,6 @@ class FasterWhisperEngine:
             beam_size=1,
             condition_on_previous_text=False,
             vad_filter=False,  # our own VAD already cut this audio
+            **self._decode_options(),
         )
         return " ".join(segment.text.strip() for segment in segments).strip()

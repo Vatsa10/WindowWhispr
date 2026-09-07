@@ -22,6 +22,11 @@ from core.model_manager import ensure_required_models
 
 _log = logging.getLogger("winwhispr.asr")
 
+#: Audio kept from before the key was pressed, when the microphone is left
+#: open. People start talking as they press, and a capture device that takes
+#: 100-200ms to start would otherwise eat the first syllable.
+PREROLL_SECONDS = 0.4
+
 
 def _ov_cache_dir() -> str | None:
     """Directory for OpenVINO compiled-model caching under ~/.cache/winwhispr.
@@ -587,7 +592,7 @@ class AudioCapture:
     """
 
     def __init__(self, sample_rate: int = 16000, block_seconds: float = 0.25,
-                 on_level=None, device=None):
+                 on_level=None, device=None, preroll_seconds: float = 0.0):
         self._sample_rate = sample_rate
         # None means "whatever Windows calls the default input device".
         self._device = device
@@ -597,19 +602,26 @@ class AudioCapture:
         # Optional live level meter for the overlay. Called on the PortAudio
         # thread, so it must be fast and non-blocking.
         self._on_level = on_level
+        # Audio kept from before the key was pressed. Costs nothing when the
+        # stream is cold; recovers the clipped first syllable when it is warm.
+        self._preroll_seconds = max(0.0, float(preroll_seconds))
 
     def start(self) -> None:
-        """Open the persistent input stream (idempotent)."""
+        """Open the persistent input stream (idempotent).
+
+        Frames already buffered are kept as *pre-roll* when the stream was
+        already open: people start speaking as they press the key, not after
+        it, and a device that takes 100-200ms to start would otherwise clip the
+        first word. Anything older than ``preroll_seconds`` is dropped.
+        """
         if self._stream is not None:
+            self._trim_to_preroll()
             return
         import sounddevice as sd
 
-        # Drop any stale frames buffered from a previous session.
-        try:
-            while True:
-                self._frame_queue.get_nowait()
-        except queue.Empty:
-            pass
+        # A cold stream has no usable pre-roll, only stale audio from an
+        # earlier session. Drop all of it.
+        self._drain_queue()
 
         def _callback(indata, _frames, _time_info, _status) -> None:
             mono = indata[:, 0].copy()
@@ -630,6 +642,34 @@ class AudioCapture:
         )
         stream.start()
         self._stream = stream
+
+    def _drain_queue(self) -> None:
+        try:
+            while True:
+                self._frame_queue.get_nowait()
+        except queue.Empty:
+            pass
+
+    def _trim_to_preroll(self) -> None:
+        """Keep only the most recent ``preroll_seconds`` of buffered audio."""
+        frames = []
+        try:
+            while True:
+                frames.append(self._frame_queue.get_nowait())
+        except queue.Empty:
+            pass
+        if not frames or self._preroll_seconds <= 0:
+            return
+        keep = int(self._sample_rate * self._preroll_seconds)
+        total = 0
+        kept: list[np.ndarray] = []
+        for block in reversed(frames):
+            kept.append(block)
+            total += len(block)
+            if total >= keep:
+                break
+        for block in reversed(kept):
+            self._frame_queue.put(block)
 
     def stop(self) -> None:
         """Close the stream and release the microphone."""
@@ -708,6 +748,7 @@ class TextPipeline:
         on_level=None,
         input_device=None,
         stream_segments: bool = False,
+        keep_mic_open: bool = False,
     ):
         self._model_display_name = model_display_name
         self._log_transcript = log_transcript
@@ -723,8 +764,14 @@ class TextPipeline:
         )
         self._max_segment_samples = int(self._sample_rate * max_seconds)
 
+        self._keep_mic_open = bool(keep_mic_open)
         self._capture = AudioCapture(
-            sample_rate=16000, on_level=on_level, device=input_device
+            sample_rate=16000,
+            on_level=on_level,
+            device=input_device,
+            # Pre-roll is only reachable while the stream stays open, so the two
+            # are one decision rather than two knobs that must agree.
+            preroll_seconds=PREROLL_SECONDS if self._keep_mic_open else 0.0,
         )
         self._vad = SileroVADChunker(
             model_paths["vad_model_path"],
@@ -773,8 +820,14 @@ class TextPipeline:
             print(f"[WinWhispr][audio] Could not start capture stream: {exc}")
 
     def stop_capture(self) -> None:
-        """Close the microphone stream at the end of a dictation session."""
-        self._capture.stop()
+        """Release the microphone at the end of a dictation session.
+
+        Unless pre-roll is enabled: recovering the syllable spoken before the
+        key registered requires audio from before the key registered, which
+        requires the stream to already be running.
+        """
+        if not self._keep_mic_open:
+            self._capture.stop()
         self._buffer = np.empty((0,), dtype=np.float32)
 
     def discard_session(self) -> None:
@@ -784,6 +837,12 @@ class TextPipeline:
     def warmup(self) -> None:
         """Load the model now rather than on the first dictation."""
         self._asr.warmup()
+
+    def set_vocabulary(self, terms) -> None:
+        """Bias speech recognition toward these names and terms."""
+        setter = getattr(self._asr, "set_vocabulary", None)
+        if setter is not None:
+            setter(terms)
 
     @property
     def engine_label(self) -> str:

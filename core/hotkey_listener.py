@@ -114,6 +114,7 @@ class HotkeyListener:
         hands_free_double_tap=False,
         toggle_enabled=False,
         sound_on_start=True,
+        keep_mic_open=False,
         paste_last_hotkey=DEFAULT_PASTE_LAST_HOTKEY,
         copy_last_hotkey=DEFAULT_COPY_LAST_HOTKEY,
         on_note=None,
@@ -135,6 +136,7 @@ class HotkeyListener:
             on_level=on_level,
             input_device=input_device or None,
             stream_segments=((commit_mode or DEFAULT_COMMIT_MODE) == COMMIT_STREAM),
+            keep_mic_open=bool(keep_mic_open),
         )
         self._reformat_hotkey = reformat_hotkey or DEFAULT_REFORMAT_HOTKEY
         self._reformatter = Reformatter(
@@ -439,6 +441,28 @@ class HotkeyListener:
         except Exception as exc:  # pragma: no cover - COM/platform dependent
             print(f"[WinWhispr][autolearn] watcher unavailable: {exc}")
 
+    def _push_vocabulary(self) -> None:
+        """Tell the recognizer which names to expect.
+
+        The dictionary has always fed the cleanup model, which can only repair
+        a mis-heard name after the fact — and often cannot, because "ChargeBee"
+        heard as "charge B" has already lost the information. Whisper accepts
+        the same words as a decoding hint, so the fix moves to where the
+        mistake happens.
+        """
+        if self._dictionary is None:
+            return
+        try:
+            terms = []
+            for entry in self._dictionary.entries():
+                terms.append(entry.correct)
+            self._pipeline.set_vocabulary(terms)
+            if terms:
+                print(f"[WinWhispr][asr] biasing recognition toward "
+                      f"{len(terms)} dictionary term(s)")
+        except Exception as exc:  # pragma: no cover - store guard
+            print(f"[WinWhispr][dictionary] could not apply vocabulary: {exc}")
+
     def _vocab_for(self, raw_text: str) -> list:
         """Dictionary entries phonetically relevant to this utterance."""
         if self._dictionary is None:
@@ -512,6 +536,7 @@ class HotkeyListener:
         """Load and exercise the speech model in the background at startup."""
         started = time.time()
         try:
+            self._push_vocabulary()
             self._pipeline.warmup()
             print(f"[WinWhispr][asr] ready in {time.time() - started:.1f}s "
                   f"({self._pipeline.engine_label})")

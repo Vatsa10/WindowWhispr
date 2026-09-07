@@ -61,6 +61,11 @@ DEFAULT_CONFIG = {
     "hands_free_double_tap": False,
     # The older press-to-start / press-to-stop chord (see "hotkey" above).
     "toggle_enabled": False,
+    # Keep the microphone stream open between dictations so the ~0.4s before
+    # the key registered is still available. It recovers the clipped first
+    # syllable, at the cost of the microphone being open whenever WinWhispr is
+    # running. Off by default: that is the user's call, not ours.
+    "keep_mic_open": False,
     # Floating status pill near the bottom of the screen.
     "pill_enabled": True,
     "sound_on_start": True,
