@@ -181,3 +181,20 @@ def test_a_language_change_reaches_a_page_that_is_already_open():
 
 def test_a_plain_string_language_still_works():
     assert WebServer(language="fr-FR").health()["language"] == "fr-FR"
+
+
+# --- the pill as the way back to the app ---------------------------------
+
+
+def test_double_click_raises_the_app():
+    """Once the window is closed to the tray the pill is the only handle."""
+    raised = []
+    web = _server()
+    web.on_show_app = lambda: raised.append(True)
+    assert web.show_app() == {"shown": True}
+    assert raised == [True]
+
+
+def test_asking_for_the_app_when_there_is_none_is_not_an_error():
+    # "listen" mode has no desktop window; the pill must not break there.
+    assert _server().show_app() == {"shown": False}

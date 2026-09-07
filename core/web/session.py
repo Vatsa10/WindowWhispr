@@ -33,10 +33,11 @@ class BrowserDictation:
     called from server threads, so a GUI caller must marshal them.
     """
 
-    def __init__(self, on_transcript=None, on_state=None,
+    def __init__(self, on_transcript=None, on_state=None, on_show_app=None,
                  key: str = "right ctrl", port: int = DEFAULT_PORT):
         self._on_transcript = on_transcript
         self._on_state = on_state
+        self._on_show_app = on_show_app
         self._key = key
         self._port = port
         self._server = None
@@ -52,6 +53,7 @@ class BrowserDictation:
         """Bind, hook the key, and open the recognizer window."""
         self._server = build_hotkey_services(allow_paste=True)
         self._server.on_transcript = self._record
+        self._server.on_show_app = self._on_show_app
 
         bound = self._bind()
         self.url = f"http://127.0.0.1:{bound}/listen"

@@ -222,6 +222,14 @@ arm.addEventListener("click", async () => {
   }
 });
 
+// Double-click opens the app. The pill is the only handle on it once the
+// window has been closed to the tray, so this is not a shortcut, it is the way
+// back in.
+document.addEventListener("dblclick", () => {
+  if (!arm.hidden) return;
+  post("/api/show", {}).catch(() => {});
+});
+
 // Right-click is the only affordance a pill this small has room for. It grows
 // to fit the menu rather than clipping it.
 document.addEventListener("contextmenu", (event) => {

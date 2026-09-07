@@ -81,6 +81,8 @@ class WebServer:
         self.allow_paste = bool(allow_paste)
         #: Present only in hotkey mode, where a browser tab is the recognizer.
         self.bridge = bridge
+        #: Called when the pill asks for the main window. Set by its owner.
+        self.on_show_app = None
         #: Called with each finished transcript, for the activity log and
         #: usage stats. Set by whoever owns this server.
         self.on_transcript = None
@@ -159,6 +161,14 @@ class WebServer:
         if self.on_transcript is not None:
             self.on_transcript(text)
         return {"text": text, "pasted": pasted}
+
+    def show_app(self) -> dict:
+        """Bring the desktop window up. The pill is the only way to reach it
+        once the window is closed to the tray."""
+        if self.on_show_app is None:
+            return {"shown": False}
+        self.on_show_app()
+        return {"shown": True}
 
     def build(self, host: str = "127.0.0.1", port: int = DEFAULT_PORT):
         handler = _make_handler(self)
@@ -271,6 +281,8 @@ def _make_handler(server: WebServer):
                 return self._send_json(server.stt(payload))
             if path == "/api/tidy":
                 return self._send_json(server.tidy(payload))
+            if path == "/api/show":
+                return self._send_json(server.show_app())
             if path == "/api/final":
                 return self._send_json(server.final(payload))
             if path == "/api/paste":

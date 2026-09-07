@@ -125,6 +125,8 @@ class EngineBridge(QObject):
     diagnostic = Signal(str, str)
     #: Live mic levels for the overlay waveform.
     levels = Signal(list)
+    #: The pill was double-clicked: bring the main window up.
+    show_app = Signal()
 
 
 class MainWindow(QMainWindow):
@@ -189,10 +191,14 @@ class MainWindow(QMainWindow):
         self._bridge.bar_state.connect(self._on_bar_state)
         self._bridge.diagnostic.connect(self._on_diagnostic)
         self._bridge.levels.connect(self._on_levels)
+        self._bridge.show_app.connect(self._on_show_app)
 
         # The overlay pill is how dictation reports itself while another app is
-        # focused — which is nearly always.
-        self._pill = FlowPill(theme.COLORS) if self._config.get("pill_enabled", True) else None
+        # focused — which is nearly always. Browser dictation brings its own
+        # pill (it has to: the recognizer only runs inside a visible window),
+        # so building this one too would put two on screen.
+        show_pill = self._config.get("pill_enabled", True) and not self._uses_browser_engine()
+        self._pill = FlowPill(theme.COLORS) if show_pill else None
 
         # Lay out for the starting size before anything is shown, so the first
         # paint is already correct rather than snapping on the first resize.
@@ -1116,6 +1122,7 @@ class MainWindow(QMainWindow):
                 on_transcript=lambda text, words, secs:
                     self._bridge.note.emit(text, words, secs),
                 on_state=lambda listening: self._bridge.state.emit(listening),
+                on_show_app=self._bridge.show_app.emit,
                 key=self._config.get("ptt_key", "right ctrl"),
             )
             try:
@@ -1589,6 +1596,12 @@ class MainWindow(QMainWindow):
             self._show_from_tray()
 
     def _show_from_tray(self) -> None:
+        self.showNormal()
+        self.raise_()
+        self.activateWindow()
+
+    def _on_show_app(self) -> None:
+        """Raise the window from wherever it is -- hidden, minimized, behind."""
         self.showNormal()
         self.raise_()
         self.activateWindow()
