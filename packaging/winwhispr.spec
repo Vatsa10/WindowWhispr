@@ -93,6 +93,7 @@ _hiddenimports += [
     "core.asr.tiering",
     "core.web",
     "core.web.server",
+    "core.web.bridge",
     "core.web.paste",
     "core.model_store",
     "faster_whisper",

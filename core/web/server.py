@@ -13,6 +13,9 @@ Three things the page can ask for:
     POST /api/tidy    the cleanup rules and snippets this app already applies
                       to desktop dictation.
     POST /api/paste   type the text into whatever window has focus here.
+    GET  /api/events  a stream telling the tab when the hotkey is held, so a
+                      browser can be the recognizer for the whole desktop.
+    POST /api/final   a transcript from that tab: cleaned, then typed.
 
 Standard library only: this is a single-user server on a private network, and
 a web framework would be a dependency to freeze, audit and ship for no gain.
@@ -25,11 +28,14 @@ import io
 import json
 import logging
 import mimetypes
+import queue
 import secrets as _secrets
 import threading
 import wave
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+
+from core.web.bridge import KEEPALIVE_SECONDS, Bridge, format_event
 
 _log = logging.getLogger("winwhispr.web")
 
@@ -67,12 +73,14 @@ class WebServer:
     """
 
     def __init__(self, transcribe=None, tidy=None, paste=None, token: str = "",
-                 allow_paste: bool = False):
+                 allow_paste: bool = False, bridge=None):
         self._transcribe = transcribe
         self._tidy = tidy
         self._paste = paste
         self.token = token
         self.allow_paste = bool(allow_paste)
+        #: Present only in hotkey mode, where a browser tab is the recognizer.
+        self.bridge = bridge
         self._httpd = None
         self._thread = None
 
@@ -82,6 +90,7 @@ class WebServer:
             "app": "WinWhispr",
             "server_stt": self._transcribe is not None,
             "paste": self.allow_paste and self._paste is not None,
+            "hotkey": self.bridge is not None,
         }
 
     def stt(self, payload: dict) -> dict:
@@ -119,6 +128,22 @@ class WebServer:
             return {"pasted": False}
         self._paste(text)
         return {"pasted": True}
+
+    def final(self, payload: dict) -> dict:
+        """A finished utterance from the recognizer tab: clean it, type it.
+
+        Cleanup runs first so the words that land in the document are the ones
+        the desktop app would have produced -- fillers gone, spoken
+        punctuation applied, snippets expanded.
+        """
+        text = (payload.get("text") or "").strip()
+        if not text:
+            return {"text": "", "pasted": False}
+        text = self.tidy({"text": text})["text"]
+        pasted = False
+        if self.allow_paste and self._paste is not None:
+            pasted = bool(self._paste(text))
+        return {"text": text, "pasted": pasted}
 
     def build(self, host: str = "127.0.0.1", port: int = DEFAULT_PORT):
         handler = _make_handler(self)
@@ -161,6 +186,13 @@ def _make_handler(server: WebServer):
             if not server.token:
                 return True
             supplied = self.headers.get("X-WinWhispr-Token", "")
+            if not supplied and "?" in self.path:
+                # EventSource cannot set a header, so the stream carries its
+                # token in the query string instead.
+                from urllib.parse import parse_qs
+
+                query = parse_qs(self.path.split("?", 1)[1])
+                supplied = (query.get("token") or [""])[0]
             # Constant-time: this guards a route that types into the user
             # machine, so a timing oracle on the token is worth avoiding.
             return _secrets.compare_digest(supplied, server.token)
@@ -197,8 +229,12 @@ def _make_handler(server: WebServer):
             path = self.path.split("?", 1)[0]
             if path == "/api/health":
                 return self._send_json(server.health())
+            if path == "/api/events":
+                return self._send_events()
             if path in ("/", "/index.html"):
                 return self._send_static("index.html")
+            if path in ("/listen", "/listen.html"):
+                return self._send_static("listen.html")
             if path.startswith("/static/"):
                 return self._send_static(path[len("/static/"):])
             self._send_json({"error": "not found"}, 404)
@@ -220,10 +256,41 @@ def _make_handler(server: WebServer):
                 return self._send_json(server.stt(payload))
             if path == "/api/tidy":
                 return self._send_json(server.tidy(payload))
+            if path == "/api/final":
+                return self._send_json(server.final(payload))
             if path == "/api/paste":
                 result = server.paste(payload)
                 return self._send_json(result, 403 if result.get("error") else 200)
             self._send_json({"error": "not found"}, 404)
+
+        def _send_events(self) -> None:
+            """Hold the connection open and push listening state as it changes."""
+            if server.bridge is None:
+                return self._send_json({"error": "not found"}, 404)
+            if not self._authorized():
+                return self._send_json({"error": "unauthorized"}, 401)
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Cache-Control", "no-cache")
+            self.send_header("Connection", "keep-alive")
+            self.end_headers()
+            events = server.bridge.subscribe()
+            try:
+                while True:
+                    try:
+                        payload = events.get(timeout=KEEPALIVE_SECONDS)
+                    except queue.Empty:
+                        # A comment line: keeps proxies and the browser from
+                        # deciding an idle stream has died.
+                        self.wfile.write(b": keepalive\n\n")
+                    else:
+                        self.wfile.write(format_event(payload))
+                    self.wfile.flush()
+            except (BrokenPipeError, ConnectionResetError, OSError):
+                pass  # the tab closed or the network went away
+            finally:
+                server.bridge.unsubscribe(events)
+                self.close_connection = True
 
         def _send_static(self, name: str) -> None:
             # Resolve inside the static directory only: this server can be
@@ -291,6 +358,95 @@ def serve(host: str = "127.0.0.1", port: int = DEFAULT_PORT,
         print(f"[WinWhispr][web] access token: {token}")
     if allow_paste:
         print("[WinWhispr][web] typing into the focused window is ENABLED")
+    try:
+        httpd.serve_forever()
+    except KeyboardInterrupt:
+        print("\n[WinWhispr][web] stopped")
+    finally:
+        httpd.server_close()
+
+
+def build_hotkey_services(allow_paste: bool = True):
+    """Wire hotkey mode: cleanup and typing, but no local speech model.
+
+    The whole point of this mode is that the browser already has a recognizer,
+    so nothing here loads Whisper, opens a microphone, or downloads a model.
+    """
+    from core import paths, snippets
+    from core.cleanup import deterministic
+
+    snippet_table = snippets.load(paths.snippets_path())
+
+    def tidy(text: str) -> str:
+        return snippets.expand(deterministic.clean(text), snippet_table)
+
+    paste = None
+    if allow_paste:
+        from core.web.paste import paste_text
+
+        paste = paste_text
+
+    return WebServer(tidy=tidy, paste=paste, allow_paste=allow_paste,
+                     bridge=Bridge())
+
+
+def _hook_hotkey(bridge, key: str = "right ctrl"):
+    """Publish key-down and key-up for one key. Returns the hook handle.
+
+    Matching is on the event's own name rather than scan codes: the codes for
+    "right ctrl" include 29, which is LEFT ctrl, so a scan-code hook makes
+    either Ctrl start dictation. The name also identifies AltGr correctly.
+
+    The handler runs on the library's hook thread, where anything slow stalls
+    keyboard input system-wide, so it does one non-blocking publish.
+    """
+    import keyboard
+
+    key = key.lower()
+    held = {"down": False}
+
+    def on_event(event):
+        if (getattr(event, "name", "") or "").lower() != key:
+            return
+        pressed = getattr(event, "event_type", None) == "down"
+        if pressed == held["down"]:
+            return  # auto-repeat while held, or a release we never saw pressed
+        held["down"] = pressed
+        bridge.set_listening(pressed)
+
+    return keyboard.hook(on_event, suppress=False)
+
+
+def serve_hotkey(host: str = "127.0.0.1", port: int = DEFAULT_PORT,
+                 token: str = "", key: str = "right ctrl",
+                 open_browser: bool = True) -> None:
+    """Hold a key anywhere; a browser tab listens and the words are typed.
+
+    Blocking. Starts instantly -- there is no model to load.
+    """
+    import webbrowser
+
+    web = build_hotkey_services(allow_paste=True)
+    web.token = token
+
+    httpd = web.build(host, port)
+    bound = httpd.server_address[1]
+    shown = _lan_address() if host == "0.0.0.0" else host
+    page = f"http://{shown}:{bound}/listen" + (f"?token={token}" if token else "")
+
+    try:
+        _hook_hotkey(web.bridge, key)
+    except Exception as exc:  # pragma: no cover - needs a real keyboard hook
+        print(f"[WinWhispr][web] could not install the {key} hook: {exc}")
+        print("[WinWhispr][web] try running this terminal as Administrator.")
+        httpd.server_close()
+        return
+
+    print(f"[WinWhispr][web] open {page}")
+    print(f"[WinWhispr][web] arm the page once, then hold {key} in any app.")
+    if open_browser:
+        threading.Thread(target=webbrowser.open, args=(page,), daemon=True).start()
+
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:

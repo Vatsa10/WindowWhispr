@@ -8,6 +8,7 @@ which also runs the background dictation engine (global hotkey + ASR).
     python main.py setup      # download + optimize models, then exit
     python main.py models     # what is on disk, and how to reclaim it
     python main.py web        # dictate from a browser, phone included
+    python main.py listen     # hold Right Ctrl anywhere; Chrome does the STT
 """
 
 import sys
@@ -134,6 +135,41 @@ def web():
     serve(host=host, port=port, allow_paste=allow_paste, token=token)
 
 
+def listen():
+    """Hotkey dictation with the browser as the recognizer.
+
+        python main.py listen                # this machine
+        python main.py listen --key "f13"    # a different talk key
+        python main.py listen --lan          # arm the page from a phone
+        python main.py listen --no-browser
+
+    A tab does the listening and the transcribing with the browser own speech
+    engine; this process owns the global hotkey and types the result into
+    whatever window has focus. Nothing to download, and it starts instantly.
+    """
+    import secrets as _secrets
+
+    from core.web import DEFAULT_PORT
+    from core.web.server import serve_hotkey
+
+    args = sys.argv[2:]
+    lan = "--lan" in args
+    port = DEFAULT_PORT
+    key = "right ctrl"
+    if "--port" in args and args.index("--port") + 1 < len(args):
+        port = int(args[args.index("--port") + 1])
+    if "--key" in args and args.index("--key") + 1 < len(args):
+        key = args[args.index("--key") + 1]
+
+    serve_hotkey(
+        host="0.0.0.0" if lan else "127.0.0.1",
+        port=port,
+        token=_secrets.token_urlsafe(16) if lan else "",
+        key=key,
+        open_browser="--no-browser" not in args,
+    )
+
+
 def models():
     """List downloaded models and their disk usage, or delete one.
 
@@ -184,5 +220,7 @@ if __name__ == "__main__":
         models()
     elif mode == "web":
         web()
+    elif mode == "listen":
+        listen()
     else:
         main()
