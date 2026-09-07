@@ -40,6 +40,9 @@ for _pkg in (
     # default location inside a frozen bundle is read-only.
     "comtypes",
     "keyring",
+    # The recognizer window. WebView2 is Edge, and unlike Qt WebEngine it has
+    # a real speech service behind SpeechRecognition.
+    "webview",
     "faster_whisper",
     "ctranslate2",
 ):
@@ -94,6 +97,9 @@ _hiddenimports += [
     "core.web",
     "core.web.server",
     "core.web.bridge",
+    "core.web.languages",
+    "core.web.pill_host",
+    "webview",
     "core.web.paste",
     "core.model_store",
     "faster_whisper",

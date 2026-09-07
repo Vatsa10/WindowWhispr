@@ -20,6 +20,10 @@ dependencies = [
     "openvino>=2024.3.0",
     "openvino-genai>=2024.3.0",
     "pyperclip>=1.9.0",
+    # Hosts the speech recognizer in a WebView2 window. On Windows this is
+    # Edge, which -- unlike Qt WebEngine -- actually has a speech service
+    # behind SpeechRecognition; Qt terminates the renderer on start().
+    "pywebview>=5.0",
     "PySide6>=6.6.0",
     "sounddevice>=0.4.7",
     "transformers>=4.44.0",

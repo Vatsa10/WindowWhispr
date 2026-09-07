@@ -2,56 +2,55 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0a0c12">
-<title>WinWhispr — listening</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WinWhispr</title>
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; }
+  html, body { height: 100%; }
   body {
-    margin: 0; min-height: 100dvh;
-    display: grid; place-items: center; padding: 24px;
-    background: #0a0c12; color: #e6e9f2;
-    font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+    margin: 0; background: transparent; overflow: hidden;
+    display: grid; place-items: center;
+    color: #e6e9f2; font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+    user-select: none; cursor: default;
   }
-  .card {
-    width: min(420px, 100%); padding: 32px 28px; border-radius: 20px;
-    background: #12151f; border: 1px solid #232838; text-align: center;
+  .pill {
+    width: 100%; height: 100%; padding: 0 16px;
+    display: flex; align-items: center; gap: 11px;
+    border-radius: 16px; border: 1px solid #262c3e;
+    background: #12151fee; box-shadow: 0 8px 28px #0009;
   }
-  .row { display: flex; align-items: center; justify-content: center; gap: 10px; }
-  .dot { width: 12px; height: 12px; border-radius: 50%; background: #4b5266; flex: none; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: #4b5266; flex: none; }
   .dot.live { background: #4ade80; animation: pulse 1.1s ease-in-out infinite; }
   .dot.busy { background: #fbbf24; }
   .dot.error { background: #f87171; }
-  @keyframes pulse { 50% { opacity: .25; transform: scale(.8); } }
+  @keyframes pulse { 50% { opacity: .25; transform: scale(.7); } }
   @media (prefers-reduced-motion: reduce) { .dot.live { animation: none; } }
-  h1 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -.01em; }
-  .detail { margin: 10px 0 0; min-height: 3em; color: #9aa3ba; font-size: 14px; }
-  button {
-    margin-top: 18px; width: 100%; min-height: 48px; padding: 0 20px;
-    border: 0; border-radius: 12px; background: #4f7cff; color: #fff;
-    font: inherit; font-weight: 600; cursor: pointer;
+  .lines { min-width: 0; flex: 1; }
+  .state { font-weight: 600; letter-spacing: -.01em; }
+  .detail {
+    color: #8c96ad; font-size: 12px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
-  button:disabled { opacity: .5; cursor: default; }
-  .last {
-    margin-top: 22px; padding-top: 18px; border-top: 1px solid #232838;
-    color: #7d879e; font-size: 13px; text-align: left; min-height: 1.5em;
-    word-break: break-word;
+  /* Before the microphone is granted the whole pill is the button, because
+     there is no room in it for a button beside anything else. */
+  .arm {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    border: 0; border-radius: 16px; background: #4f7cff; color: #fff;
+    font: inherit; font-weight: 600; font-size: 14px; cursor: pointer;
   }
-  .hint { margin-top: 22px; color: #5d6679; font-size: 12px; }
+  .arm[hidden] { display: none; }
 </style>
 </head>
 <body>
-<main class="card">
-  <div class="row">
-    <span class="dot" id="dot"></span>
-    <h1 id="state">Starting…</h1>
+<div class="pill">
+  <span class="dot" id="dot"></span>
+  <div class="lines">
+    <div class="state" id="state">Starting…</div>
+    <div class="detail" id="detail" role="status" aria-live="polite"></div>
   </div>
-  <p class="detail" id="detail" role="status" aria-live="polite"></p>
-  <button id="arm" type="button">Allow microphone</button>
-  <p class="last" id="last"></p>
-  <p class="hint">Leave this tab open. Hold <b>Right Ctrl</b> in any app and speak.</p>
-</main>
+</div>
+<button class="arm" id="arm" type="button">Tap to enable the microphone</button>
 <script type="module" src="/static/listen.js"></script>
 </body>
 </html>

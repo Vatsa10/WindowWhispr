@@ -165,3 +165,19 @@ def test_a_release_we_never_saw_pressed_is_ignored(monkeypatch):
     bridge, on_event = _hooked(monkeypatch)
     on_event(_FakeEvent("right ctrl", "up"))
     assert bridge.listening is False
+
+
+# --- the language, chosen once ------------------------------------------
+
+
+def test_a_language_change_reaches_a_page_that_is_already_open():
+    """The app is meant to run for weeks; settings must not need a restart."""
+    chosen = {"tag": "en-US"}
+    web = WebServer(bridge=Bridge(), language=lambda: chosen["tag"])
+    assert web.health()["language"] == "en-US"
+    chosen["tag"] = "hi-IN"
+    assert web.health()["language"] == "hi-IN"
+
+
+def test_a_plain_string_language_still_works():
+    assert WebServer(language="fr-FR").health()["language"] == "fr-FR"

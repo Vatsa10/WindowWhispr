@@ -19,12 +19,15 @@ const dot = document.getElementById("dot");
 const state = document.getElementById("state");
 const detail = document.getElementById("detail");
 const arm = document.getElementById("arm");
-const last = document.getElementById("last");
 
 const token = new URLSearchParams(location.search).get("token")
   || localStorage.getItem("winwhispr-token")
   || "";
 if (token) localStorage.setItem("winwhispr-token", token);
+
+// The recognizer language, chosen once in settings. Fetched rather than
+// baked in, so changing it in the app does not need this page rebuilt.
+let language = "";
 
 let want = false;
 let live = false;
@@ -57,8 +60,10 @@ async function flush() {
   show("busy", "Typing\u2026", text);
   try {
     const result = await post("/api/final", { text });
-    last.textContent = result.text || text;
     show("idle", "Ready", result.pasted ? "Typed at your cursor." : "Typing is disabled on the PC.");
+    // Between utterances is free time: pick up a language changed in settings
+    // without the user having to restart anything.
+    loadLanguage().then(applyLanguage);
   } catch (err) {
     show("error", "Could not reach WinWhispr", String(err.message || err));
   }
@@ -68,11 +73,30 @@ async function flush() {
 
 let recognition = null;
 
+async function loadLanguage() {
+  try {
+    const health = await (await fetch("/api/health")).json();
+    // "auto" means follow the operating system, which is what the browser
+    // already reports; leaving it empty does exactly that.
+    language = health.language && health.language !== "auto" ? health.language : "";
+  } catch {
+    language = "";
+  }
+}
+
+function currentLang() {
+  return language || navigator.language || "en-US";
+}
+
+function applyLanguage() {
+  if (recognition) recognition.lang = currentLang();
+}
+
 function build() {
   const rec = new Recognition();
   rec.continuous = true;
   rec.interimResults = true;
-  rec.lang = navigator.language || "en-US";
+  rec.lang = currentLang();
 
   rec.onresult = (event) => {
     let interim = "";
@@ -177,5 +201,8 @@ if (!Recognition) {
 } else {
   recognition = build();
   show("idle", "Not armed", "Tap once to allow the microphone.");
+  // The language must be known before a session starts, not before the page
+  // renders, so this does not block arming.
+  loadLanguage().then(applyLanguage);
   listen();
 }

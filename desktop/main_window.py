@@ -39,6 +39,7 @@ from PySide6.QtWidgets import (
 )
 
 from core.config_store import load_config, save_config
+from core.web.languages import LANGUAGES, normalize as normalize_language
 from core.dictionary import SOURCE_AUTO, DictionaryStore
 from core.hotkey_listener import HotkeyListener
 from core.model_registry import (
@@ -339,6 +340,25 @@ class MainWindow(QMainWindow):
         hint.setProperty("class", "Hint")
         hint.setWordWrap(True)
         section.add_widget(hint)
+
+        lang_lbl = QLabel("Dictation language")
+        lang_lbl.setProperty("class", "FieldLabel")
+        section.add_widget(lang_lbl)
+
+        self._language_combo = QComboBox()
+        for tag, name in LANGUAGES:
+            self._language_combo.addItem(name, tag)
+        current_lang = normalize_language(self._config.get("speech_language", "auto"))
+        index = self._language_combo.findData(current_lang)
+        self._language_combo.setCurrentIndex(max(0, index))
+        self._language_combo.currentIndexChanged.connect(self._on_language_changed)
+        section.add_widget(self._language_combo)
+
+        lang_hint = QLabel("Set once and left alone. Applies to browser dictation; "
+                           "the local model detects the language on its own.")
+        lang_hint.setProperty("class", "Hint")
+        lang_hint.setWordWrap(True)
+        section.add_widget(lang_hint)
 
     def _build_cloud_section(self, section: CollapsibleSection) -> None:
         key_label = QLabel("Groq API key")
@@ -1216,6 +1236,10 @@ class MainWindow(QMainWindow):
 
     def _on_model_changed(self, value: str) -> None:
         self._update_config({"asr_model": value})
+
+    def _on_language_changed(self, index: int) -> None:
+        tag = self._language_combo.itemData(index) or "auto"
+        self._update_config({"speech_language": tag})
 
     def _on_device_changed(self, value: str) -> None:
         self._update_config({"asr_device": value})

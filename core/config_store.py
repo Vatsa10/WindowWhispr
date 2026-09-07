@@ -68,6 +68,9 @@ DEFAULT_CONFIG = {
     "keep_mic_open": False,
     # Floating status pill near the bottom of the screen.
     "pill_enabled": True,
+    # The browser recognizer's language. Set once in settings and then left
+    # alone; "auto" follows the operating system.
+    "speech_language": "auto",
     "sound_on_start": True,
     # Reuse the last transcript without dictating it again.
     "paste_last_hotkey": "ctrl+alt+v",

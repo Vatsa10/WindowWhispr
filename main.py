@@ -141,7 +141,7 @@ def listen():
         python main.py listen                # this machine
         python main.py listen --key "f13"    # a different talk key
         python main.py listen --lan          # arm the page from a phone
-        python main.py listen --no-browser
+        python main.py listen --no-window   # use your own browser tab
 
     A tab does the listening and the transcribing with the browser own speech
     engine; this process owns the global hotkey and types the result into
@@ -166,7 +166,7 @@ def listen():
         port=port,
         token=_secrets.token_urlsafe(16) if lan else "",
         key=key,
-        open_browser="--no-browser" not in args,
+        window="--no-window" not in args,
     )
 
 
@@ -222,5 +222,11 @@ if __name__ == "__main__":
         web()
     elif mode == "listen":
         listen()
+    elif mode == "pill":
+        # The recognizer window, started as a child of "listen". Not meant to
+        # be run by hand, but harmless if it is.
+        from core.web.pill_host import run
+
+        run(sys.argv[2])
     else:
         main()

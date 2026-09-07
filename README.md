@@ -54,6 +54,35 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the internal design.
 - **Reset all data** button in the sidebar to wipe usage metrics and the
   activity log.
 
+## Dictate with the browser's speech engine
+
+```powershell
+uv run python main.py listen
+```
+
+Hold **`Right Ctrl`** in any application, speak, let go — the words are typed
+at your cursor. Nothing to download and no model to load, so it is ready the
+moment it starts.
+
+The recognizer is Edge's, running in a small always-on-top pill at the bottom
+of the screen. Approve the microphone once, on the pill, and it is remembered.
+Set the language once in **Dictation language** in the sidebar; it is picked up
+without a restart.
+
+> The pill stays on screen on purpose. Chromium freezes the renderer of a
+> window that is hidden or off-screen, and a frozen renderer hears nothing —
+> measured: neither produced so much as an `onstart`.
+
+Two things to know before choosing this over the local model: the audio goes to
+Microsoft's speech service, so this mode is not offline; and it needs the
+WebView2 runtime, which ships with Windows 11 and installs with Edge on
+Windows 10.
+
+```powershell
+uv run python main.py listen --key "f13"    # a different talk key
+uv run python main.py listen --no-window    # use your own browser tab instead
+```
+
 ## Dictate from a browser
 
 ```powershell

@@ -73,7 +73,7 @@ class WebServer:
     """
 
     def __init__(self, transcribe=None, tidy=None, paste=None, token: str = "",
-                 allow_paste: bool = False, bridge=None):
+                 allow_paste: bool = False, bridge=None, language: str = "auto"):
         self._transcribe = transcribe
         self._tidy = tidy
         self._paste = paste
@@ -81,8 +81,17 @@ class WebServer:
         self.allow_paste = bool(allow_paste)
         #: Present only in hotkey mode, where a browser tab is the recognizer.
         self.bridge = bridge
+        #: BCP-47 tag for the recognizer, or "auto" to follow the system.
+        #: A callable is re-read on every request, so changing the language in
+        #: settings reaches a page that has been open for days.
+        self._language = language
         self._httpd = None
         self._thread = None
+
+    @property
+    def language(self) -> str:
+        value = self._language
+        return value() if callable(value) else value
 
     def health(self) -> dict:
         return {
@@ -91,6 +100,7 @@ class WebServer:
             "server_stt": self._transcribe is not None,
             "paste": self.allow_paste and self._paste is not None,
             "hotkey": self.bridge is not None,
+            "language": self.language,
         }
 
     def stt(self, payload: dict) -> dict:
@@ -374,8 +384,15 @@ def build_hotkey_services(allow_paste: bool = True):
     """
     from core import paths, snippets
     from core.cleanup import deterministic
+    from core.config_store import load_config
+    from core.web.languages import normalize
 
     snippet_table = snippets.load(paths.snippets_path())
+
+    def language() -> str:
+        # Re-read rather than captured: the app is meant to stay running, and
+        # a language chosen in settings should not need a restart.
+        return normalize(load_config().get("speech_language", "auto"))
 
     def tidy(text: str) -> str:
         return snippets.expand(deterministic.clean(text), snippet_table)
@@ -387,7 +404,7 @@ def build_hotkey_services(allow_paste: bool = True):
         paste = paste_text
 
     return WebServer(tidy=tidy, paste=paste, allow_paste=allow_paste,
-                     bridge=Bridge())
+                     bridge=Bridge(), language=language)
 
 
 def _hook_hotkey(bridge, key: str = "right ctrl"):
@@ -417,22 +434,37 @@ def _hook_hotkey(bridge, key: str = "right ctrl"):
     return keyboard.hook(on_event, suppress=False)
 
 
+def spawn_pill(url: str):
+    """Start the recognizer window as a child process. Returns the process.
+
+    A child rather than a thread: pywebview drives its own Win32 event loop
+    and cannot share a process with Qt's.
+    """
+    import subprocess
+    import sys
+
+    if getattr(sys, "frozen", False):
+        argv = [sys.executable, "pill", url]
+    else:
+        argv = [sys.executable, "-m", "core.web.pill_host", url]
+    return subprocess.Popen(argv)
+
+
 def serve_hotkey(host: str = "127.0.0.1", port: int = DEFAULT_PORT,
                  token: str = "", key: str = "right ctrl",
-                 open_browser: bool = True) -> None:
-    """Hold a key anywhere; a browser tab listens and the words are typed.
+                 window: bool = True) -> None:
+    """Hold a key anywhere; the recognizer window listens and types the result.
 
-    Blocking. Starts instantly -- there is no model to load.
+    Blocking, and meant to stay running: there is no model to load, so it is
+    ready the moment it starts and costs nothing while it waits.
     """
-    import webbrowser
-
     web = build_hotkey_services(allow_paste=True)
     web.token = token
 
     httpd = web.build(host, port)
     bound = httpd.server_address[1]
     shown = _lan_address() if host == "0.0.0.0" else host
-    page = f"http://{shown}:{bound}/listen" + (f"?token={token}" if token else "")
+    url = f"http://{shown}:{bound}/listen" + (f"?token={token}" if token else "")
 
     try:
         _hook_hotkey(web.bridge, key)
@@ -442,16 +474,21 @@ def serve_hotkey(host: str = "127.0.0.1", port: int = DEFAULT_PORT,
         httpd.server_close()
         return
 
-    print(f"[WinWhispr][web] open {page}")
-    print(f"[WinWhispr][web] arm the page once, then hold {key} in any app.")
-    if open_browser:
-        threading.Thread(target=webbrowser.open, args=(page,), daemon=True).start()
+    print(f"[WinWhispr][web] language: {web.language}")
+    print(f"[WinWhispr][web] hold {key} in any app and speak.")
+    child = None
+    if window:
+        child = spawn_pill(url)
+    else:
+        print(f"[WinWhispr][web] open {url}")
 
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
         print("\n[WinWhispr][web] stopped")
     finally:
+        if child is not None and child.poll() is None:
+            child.terminate()
         httpd.server_close()
 
 
