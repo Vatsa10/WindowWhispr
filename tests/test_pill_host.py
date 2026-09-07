@@ -16,8 +16,9 @@ def test_idle_is_the_smallest_state():
 
 
 def test_idle_is_small_enough_to_ignore():
+    """It sits on screen all day over whatever you are working in."""
     width, height = SIZES["idle"]
-    assert width <= 160 and height <= 36
+    assert width <= 180 and height <= 44
 
 
 def test_every_state_has_a_size():

@@ -42,6 +42,10 @@ let buffer = "";
 
 function show(kind, label, note) {
   dot.className = "dot " + kind;
+  // The body carries the state as well, because the pill's outline shadow
+  // changes colour with it and CSS cannot read a sibling's class.
+  document.body.classList.remove("state-live", "state-error", "state-busy");
+  if (kind) document.body.classList.add("state-" + kind);
   state.textContent = label;
   if (note !== undefined) detail.textContent = note;
 }
@@ -56,7 +60,8 @@ let size = "";
 function resize(next) {
   if (next === size) return;
   size = next;
-  document.body.className = "size-" + next;
+  document.body.classList.remove("size-idle", "size-live", "size-arm", "size-menu");
+  document.body.classList.add("size-" + next);
   window.pywebview?.api?.set_size(next);
 }
 

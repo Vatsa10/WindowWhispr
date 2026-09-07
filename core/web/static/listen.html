@@ -5,62 +5,111 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>WinWhispr</title>
 <style>
-  :root { color-scheme: dark; }
+  /* The pill.
+   *
+   * Same language as the app window -- one hard outline, one offset shadow --
+   * but dark, because it floats over whatever you are working in and a paper
+   * lozenge would read as a stray dialog. The shadow is what separates it from
+   * the desktop underneath without a drop-shadow blur, which WebView2 would
+   * clip at the window edge anyway.
+   */
+  @font-face {
+    font-family: "Space Grotesk";
+    src: url("/static/vendor/space-grotesk.woff2") format("woff2");
+    font-weight: 400 700;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: "Inter";
+    src: url("/static/vendor/inter.woff2") format("woff2");
+    font-weight: 100 900;
+    font-display: swap;
+  }
+
+  :root {
+    color-scheme: dark;
+    --ink: #1a1a1a;
+    --panel: #1e293b;
+    --panel-2: #273548;
+    --paper: #f5f0e8;
+    --yellow: #ffcc00;
+    --green: #22c55e;
+    --red: #e63b2e;
+    --muted: #94a3b8;
+  }
   * { box-sizing: border-box; }
   html, body { height: 100%; }
   body {
     margin: 0; overflow: hidden;
-    /* Opaque, and the same colour the window is painted: WebView2 has no
-       transparent backdrop on Windows, so a rounded corner over a transparent
-       window shows a white triangle instead of the desktop. */
-    background: #12151f;
-    color: #e6e9f2; font: 13px/1.35 system-ui, -apple-system, "Segoe UI", sans-serif;
+    /* The window is painted this colour too: WebView2 has no transparent
+       backdrop on Windows, so anything showing through would be white. */
+    background: var(--ink);
+    color: var(--paper);
+    font-family: "Inter", system-ui, "Segoe UI", sans-serif;
+    font-size: 12.5px;
     user-select: none; cursor: default;
   }
+
   .pill {
-    height: 100%; padding: 0 12px;
-    display: flex; align-items: center; gap: 9px;
-    border: 1px solid #2a3145;
+    position: absolute; inset: 0 4px 4px 0;
+    display: flex; align-items: center; gap: 10px;
+    padding: 0 12px;
+    background: var(--panel);
+    border: 2px solid var(--paper);
+    box-shadow: 4px 4px 0 var(--yellow);
   }
-  .dot { width: 8px; height: 8px; border-radius: 50%; background: #4b5266; flex: none; }
-  .dot.live { background: #4ade80; animation: pulse 1.1s ease-in-out infinite; }
-  .dot.busy { background: #fbbf24; }
-  .dot.error { background: #f87171; }
-  @keyframes pulse { 50% { opacity: .25; transform: scale(.7); } }
+  body.state-error .pill { box-shadow: 4px 4px 0 var(--red); }
+  body.state-live .pill { box-shadow: 4px 4px 0 var(--green); }
+
+  .dot { width: 9px; height: 9px; flex: none; border: 1px solid var(--paper); background: #64748b; }
+  .dot.live { background: var(--green); animation: blink 1.2s steps(2, end) infinite; }
+  .dot.busy { background: var(--yellow); }
+  .dot.error { background: var(--red); }
+  @keyframes blink { 50% { opacity: .2; } }
   @media (prefers-reduced-motion: reduce) { .dot.live { animation: none; } }
 
   .lines { min-width: 0; flex: 1; }
   .state {
-    font-weight: 600; font-size: 12px; letter-spacing: -.01em;
+    font-family: "Space Grotesk", sans-serif;
+    font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .detail {
-    color: #8c96ad; font-size: 12px; margin-top: 1px;
+    color: var(--muted); font-size: 11.5px; margin-top: 1px;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
-  /* Idle is a lozenge the size of a word: the second line would not fit and
+  /* Idle is a lozenge the width of a word: the second line would not fit and
      has nothing to say. */
   body.size-idle .detail { display: none; }
-  body.size-idle .state { font-size: 12px; }
 
-  /* Before the microphone is granted the whole pill is the button: there is
-     no room in it for a button beside anything else. */
+  /* Before the microphone is granted the whole pill is the button: there is no
+     room in it for a button beside anything else. */
   .overlay {
-    position: absolute; inset: 0;
+    position: absolute; inset: 0 4px 4px 0;
     display: flex; align-items: center; justify-content: center; gap: 8px;
-    background: #12151f;
+    background: var(--yellow); color: var(--ink);
+    border: 2px solid var(--ink); box-shadow: 4px 4px 0 var(--paper);
   }
   .overlay[hidden] { display: none; }
+
   button {
-    border: 0; border-radius: 8px; background: #4f7cff; color: #fff;
-    font: inherit; font-weight: 600; font-size: 13px; cursor: pointer;
-    padding: 9px 14px;
+    border: 2px solid var(--ink);
+    background: var(--paper); color: var(--ink);
+    font-family: "Space Grotesk", sans-serif;
+    font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em;
+    cursor: pointer; padding: 9px 12px;
+    box-shadow: 2px 2px 0 var(--ink);
+    transition: transform 120ms cubic-bezier(.2,.8,.3,1), box-shadow 120ms cubic-bezier(.2,.8,.3,1);
   }
-  #arm { position: absolute; inset: 0; width: 100%; border-radius: 0; }
-  #menu { flex-direction: column; padding: 10px; }
+  button:active { transform: translate(2px, 2px); box-shadow: none; }
+  #arm {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    border: 0; background: transparent; box-shadow: none;
+  }
+  #arm:active { transform: none; }
+  #menu { flex-direction: column; padding: 10px; background: var(--paper); }
   #menu button { width: 100%; }
-  #quit { background: #7f1d1d; }
-  #dismiss { background: #232a3c; }
+  #quit { background: var(--red); color: #fff; }
 </style>
 </head>
 <body class="size-arm">

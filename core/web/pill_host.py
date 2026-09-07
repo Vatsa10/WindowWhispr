@@ -22,10 +22,10 @@ import sys
 
 #: (width, height) per state. Idle is the size it spends all day at.
 SIZES = {
-    "idle": (128, 30),
-    "live": (340, 62),
-    "arm": (260, 44),
-    "menu": (200, 84),
+    "idle": (150, 38),
+    "live": (360, 74),
+    "arm": (280, 52),
+    "menu": (220, 108),
 }
 
 #: The settings window. A minimum rather than a fixed size: the layout is a
