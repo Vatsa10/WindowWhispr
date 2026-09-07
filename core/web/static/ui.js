@@ -9,6 +9,7 @@
 // pause is a continuation, not a correction of the first one.
 
 import { api, createListener, webSpeechAvailable } from "/static/app.js";
+import { insertAtCaret, isTextField } from "/static/insert.js";
 import { createWaveform } from "/static/waveform.js";
 
 // --- DOM lookups, once ------------------------------------------------
@@ -89,11 +90,36 @@ function setTalkBusy(busy) {
 
 // --- transcript ------------------------------------------------------
 
+// The field the words should go into: whichever text field the user was last
+// in, falling back to the transcript. Tracked rather than read live, because
+// tapping the talk button moves focus to the button itself.
+let lastField = text;
+
+document.addEventListener("focusin", (e) => {
+  if (isTextField(e.target)) lastField = e.target;
+});
+
 function append(transcript) {
   if (!transcript) return;
-  const existing = text.value.trim();
-  text.value = existing ? existing + " " + transcript : transcript;
-  text.scrollTop = text.scrollHeight;
+  const field = isTextField(lastField) && document.contains(lastField) ? lastField : text;
+  const { value, caret } = insertAtCaret(
+    field.value,
+    field.selectionStart ?? field.value.length,
+    field.selectionEnd ?? field.value.length,
+    transcript
+  );
+  field.value = value;
+  // Put the caret after the words just inserted, so dictating again continues
+  // from there instead of jumping back to where the field was clicked.
+  try {
+    field.setSelectionRange(caret, caret);
+  } catch {
+    // Some input types refuse selection APIs; the text is in either way.
+  }
+  // Let anything watching the field know it changed — a form's own validation
+  // or character counter listens for this, and would otherwise miss dictation.
+  field.dispatchEvent(new Event("input", { bubbles: true }));
+  if (field === text) field.scrollTop = field.scrollHeight;
 }
 
 async function tidy(raw, tokenPrompted) {
@@ -266,7 +292,7 @@ talk.addEventListener("click", () => {
 // Space toggles, the way a key does on the desktop — except while typing in
 // the transcript, where space is just a space.
 document.addEventListener("keydown", (e) => {
-  if (e.code === "Space" && document.activeElement !== text) {
+  if (e.code === "Space" && !isTextField(document.activeElement)) {
     e.preventDefault();
     talk.click();
   }

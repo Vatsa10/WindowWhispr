@@ -253,7 +253,7 @@ def test_the_module_graph_resolves(server):
     """ui.js imports app.js by absolute path; both must be reachable."""
     _web, client = server
     _status, ui = client.get("/static/ui.js")
-    for imported in {"/static/app.js"}:
+    for imported in {"/static/app.js", "/static/insert.js"}:
         assert imported.encode() in ui
         assert client.get(imported)[0] == 200
 
@@ -377,3 +377,24 @@ def test_every_svg_icon_use_points_at_a_defined_symbol(server):
 
     missing = referenced - defined
     assert not missing, f"<use> references undefined symbols: {missing}"
+
+
+def test_caret_insertion_rules():
+    """The spacing and caret maths for inserting dictation into a field.
+
+    Run through Node because the logic is JavaScript that a browser executes;
+    a Python reimplementation would test a copy rather than the real thing.
+    Skips rather than fails where Node is absent, so the suite still runs on a
+    machine that only has Python.
+    """
+    import shutil
+    import subprocess
+    from pathlib import Path
+
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node is not installed; the JS assertions cannot run here")
+
+    spec = Path(__file__).parent / "insert_spec.mjs"
+    result = subprocess.run([node, str(spec)], capture_output=True, text=True, timeout=60)
+    assert result.returncode == 0, result.stdout + result.stderr
