@@ -70,6 +70,10 @@ DEFAULT_CONFIG = {
     "pill_enabled": True,
     # The browser recognizer's language. Set once in settings and then left
     # alone; "auto" follows the operating system.
+    # Which recognizer dictation uses. "browser" is the default because it
+    # works the moment the app is installed -- no model to download, no wait
+    # on first run. "local" is the offline one.
+    "speech_engine": "browser",
     "speech_language": "auto",
     # What "start at login" launches: the desktop app, or browser dictation.
     "startup_mode": "app",

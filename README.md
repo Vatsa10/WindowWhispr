@@ -54,20 +54,28 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the internal design.
 - **Reset all data** button in the sidebar to wipe usage metrics and the
   activity log.
 
-## Dictate with the browser's speech engine
+## The browser's speech engine, inside the app
+
+This is the default, and there is nothing to set up: start WinWhispr, approve
+the microphone once on the pill, and hold **`Right Ctrl`** in any application.
+No model downloads and nothing loads, so it works the minute it is installed.
+
+The recognizer is Edge's, running in a small always-on-top pill at the bottom
+of the screen — started, watched and closed by the app itself. No browser is
+ever opened. Set the language once in **Dictation language** in the sidebar; it
+is picked up without a restart, and it stays set.
+
+Switch to the local model any time in **Speech engine** in the sidebar: that
+one is fully offline, at the cost of a one-time download.
+
+Everything else is the same either way — the transcript is cleaned, snippets
+expand, and it lands in the activity log and your stats.
+
+If you would rather run it without the desktop window:
 
 ```powershell
 uv run python main.py listen
 ```
-
-Hold **`Right Ctrl`** in any application, speak, let go — the words are typed
-at your cursor. Nothing to download and no model to load, so it is ready the
-moment it starts.
-
-The recognizer is Edge's, running in a small always-on-top pill at the bottom
-of the screen. Approve the microphone once, on the pill, and it is remembered.
-Set the language once in **Dictation language** in the sidebar; it is picked up
-without a restart.
 
 The pill is a lozenge the width of a word while it waits, grows while you
 speak, and shrinks again once the words have been typed. Right-click it to

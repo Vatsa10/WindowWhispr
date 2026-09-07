@@ -40,6 +40,7 @@ from PySide6.QtWidgets import (
 
 from core.config_store import load_config, save_config
 from core.web.languages import LANGUAGES, normalize as normalize_language
+from core.web.session import BrowserDictation
 from core.dictionary import SOURCE_AUTO, DictionaryStore
 from core.hotkey_listener import HotkeyListener
 from core.model_registry import (
@@ -66,7 +67,7 @@ from desktop.widgets import (
 
 _ICON_PNG = str(paths.asset_path("winwhispr.png"))
 
-_PIPELINE_KEYS = {"hotkey", "vad_threshold", "asr_model", "asr_device", "log_transcript", "min_silence_ms", "max_segment_seconds", "reformat_hotkey", "llm_model", "llm_device", "commit_mode", "cleanup_level", "cleanup_timeout_ms", "per_app_formatting", "cleanup_provider", "groq_cleanup_model", "ptt_enabled", "ptt_key", "cancel_key", "sound_on_start", "input_device", "paste_last_hotkey", "copy_last_hotkey", "autolearn_enabled", "hands_free_double_tap", "toggle_enabled", "keep_mic_open"}
+_PIPELINE_KEYS = {"hotkey", "vad_threshold", "asr_model", "asr_device", "speech_engine", "log_transcript", "min_silence_ms", "max_segment_seconds", "reformat_hotkey", "llm_model", "llm_device", "commit_mode", "cleanup_level", "cleanup_timeout_ms", "per_app_formatting", "cleanup_provider", "groq_cleanup_model", "ptt_enabled", "ptt_key", "cancel_key", "sound_on_start", "input_device", "paste_last_hotkey", "copy_last_hotkey", "autolearn_enabled", "hands_free_double_tap", "toggle_enabled", "keep_mic_open"}
 
 _log = logging.getLogger("winwhispr.gui")
 
@@ -132,6 +133,8 @@ class MainWindow(QMainWindow):
         self._config = config
         self._bridge = EngineBridge()
         self._listener: HotkeyListener | None = None
+        #: Set instead of ``_listener`` when dictation runs in the browser.
+        self._browser: BrowserDictation | None = None
         self._listener_lock = threading.Lock()
         self._collapsed = False
         #: Whether the user collapsed the sidebar themselves, as opposed to the
@@ -303,6 +306,27 @@ class MainWindow(QMainWindow):
         return bar
 
     def _build_model_section(self, section: CollapsibleSection) -> None:
+        engine_lbl = QLabel("Speech engine")
+        engine_lbl.setProperty("class", "FieldLabel")
+        section.add_widget(engine_lbl)
+
+        self._engine_combo = QComboBox()
+        self._engine_combo.addItem("Browser (instant, nothing to download)", "browser")
+        self._engine_combo.addItem("This machine (fully offline)", "local")
+        engine = "local" if self._config.get("speech_engine") == "local" else "browser"
+        self._engine_combo.setCurrentIndex(self._engine_combo.findData(engine))
+        self._engine_combo.currentIndexChanged.connect(self._on_engine_changed)
+        section.add_widget(self._engine_combo)
+
+        engine_hint = QLabel(
+            "Browser dictation uses the speech engine already on this PC and is "
+            "ready immediately; the audio goes to Microsoft's service. The local "
+            "model keeps everything on the machine after a one-time download."
+        )
+        engine_hint.setProperty("class", "Hint")
+        engine_hint.setWordWrap(True)
+        section.add_widget(engine_hint)
+
         lbl = QLabel("Active model")
         lbl.setProperty("class", "FieldLabel")
         section.add_widget(lbl)
@@ -359,6 +383,11 @@ class MainWindow(QMainWindow):
         lang_hint.setProperty("class", "Hint")
         lang_hint.setWordWrap(True)
         section.add_widget(lang_hint)
+
+        # A model picker for an engine that is not running is worse than no
+        # picker: it invites a change that does nothing.
+        self._local_only = (lbl, self._model_combo, dev_lbl, self._device_combo, hint)
+        self._apply_engine_visibility()
 
     def _build_cloud_section(self, section: CollapsibleSection) -> None:
         key_label = QLabel("Groq API key")
@@ -1065,8 +1094,68 @@ class MainWindow(QMainWindow):
     def _start_engine(self) -> None:
         threading.Thread(target=self._build_listener, daemon=True).start()
 
-    def _build_listener(self) -> None:
+    def _uses_browser_engine(self) -> bool:
+        return self._config.get("speech_engine", "browser") == "browser"
+
+    def _start_browser_engine(self) -> None:
+        """Dictate with the browser's recognizer instead of a local model.
+
+        Nothing to download and nothing to warm, so this reports ready as soon
+        as the recognizer window is up rather than pretending to load.
+        """
         with self._listener_lock:
+            self._stop_engines()
+            self._bridge.busy.emit("Starting the recognizer…")
+            try:
+                import keyboard
+
+                keyboard.clear_all_hotkeys()
+            except Exception:
+                pass
+            browser = BrowserDictation(
+                on_transcript=lambda text, words, secs:
+                    self._bridge.note.emit(text, words, secs),
+                on_state=lambda listening: self._bridge.state.emit(listening),
+                key=self._config.get("ptt_key", "right ctrl"),
+            )
+            try:
+                browser.start()
+            except Exception as exc:
+                _log.exception("browser dictation failed to start")
+                self._bridge.error.emit(f"Could not start browser dictation: {exc}")
+                return
+            self._browser = browser
+            browser.watch(lambda: self._bridge.diagnostic.emit(
+                "Dictation window closed",
+                "Reopen it from the sidebar, or switch to the local model."))
+            self._asr_ready = True
+            self._llm_ready = True
+            self._bridge.ready.emit(True)
+
+    def _stop_engines(self) -> None:
+        """Tear down whichever engine is running, so only one hooks the key.
+
+        The local listener has no teardown of its own -- dropping the
+        reference and clearing the hooks is how a rebuild has always
+        released it -- but the browser one owns a child process and a
+        socket, which do have to be closed.
+        """
+        browser, self._browser = self._browser, None
+        if browser is not None:
+            browser.stop()
+        self._listener = None
+        try:
+            import keyboard
+
+            keyboard.clear_all_hotkeys()
+        except Exception:
+            pass
+
+    def _build_listener(self) -> None:
+        if self._uses_browser_engine():
+            return self._start_browser_engine()
+        with self._listener_lock:
+            self._stop_engines()
             model = self._config.get("asr_model", DEFAULT_MODEL_DISPLAY)
             device = self._config.get("asr_device", "GPU")
             _log.info("Building engine: model=%s device=%s", model, device)
@@ -1257,6 +1346,15 @@ class MainWindow(QMainWindow):
 
     def _on_model_changed(self, value: str) -> None:
         self._update_config({"asr_model": value})
+
+    def _apply_engine_visibility(self) -> None:
+        local = self._config.get("speech_engine", "browser") == "local"
+        for widget in getattr(self, "_local_only", ()):  # built later than this
+            widget.setVisible(local)
+
+    def _on_engine_changed(self, index: int) -> None:
+        self._update_config({"speech_engine": self._engine_combo.itemData(index)})
+        self._apply_engine_visibility()
 
     def _on_language_changed(self, index: int) -> None:
         tag = self._language_combo.itemData(index) or "auto"
@@ -1496,6 +1594,9 @@ class MainWindow(QMainWindow):
         self.activateWindow()
 
     def _quit(self) -> None:
+        # The recognizer is a child process; leaving it behind would keep a
+        # pill on screen with nothing driving it.
+        self._stop_engines()
         self._tray.hide()
         QApplication.quit()
 

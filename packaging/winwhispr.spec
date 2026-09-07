@@ -99,6 +99,7 @@ _hiddenimports += [
     "core.web.bridge",
     "core.web.languages",
     "core.web.pill_host",
+    "core.web.session",
     "webview",
     "core.web.paste",
     "core.model_store",

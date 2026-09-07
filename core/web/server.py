@@ -81,6 +81,9 @@ class WebServer:
         self.allow_paste = bool(allow_paste)
         #: Present only in hotkey mode, where a browser tab is the recognizer.
         self.bridge = bridge
+        #: Called with each finished transcript, for the activity log and
+        #: usage stats. Set by whoever owns this server.
+        self.on_transcript = None
         #: BCP-47 tag for the recognizer, or "auto" to follow the system.
         #: A callable is re-read on every request, so changing the language in
         #: settings reaches a page that has been open for days.
@@ -153,6 +156,8 @@ class WebServer:
         pasted = False
         if self.allow_paste and self._paste is not None:
             pasted = bool(self._paste(text))
+        if self.on_transcript is not None:
+            self.on_transcript(text)
         return {"text": text, "pasted": pasted}
 
     def build(self, host: str = "127.0.0.1", port: int = DEFAULT_PORT):
@@ -407,7 +412,7 @@ def build_hotkey_services(allow_paste: bool = True):
                      bridge=Bridge(), language=language)
 
 
-def _hook_hotkey(bridge, key: str = "right ctrl"):
+def _hook_hotkey(bridge, key: str = "right ctrl", on_change=None):
     """Publish key-down and key-up for one key. Returns the hook handle.
 
     Matching is on the event's own name rather than scan codes: the codes for
@@ -429,7 +434,8 @@ def _hook_hotkey(bridge, key: str = "right ctrl"):
         if pressed == held["down"]:
             return  # auto-repeat while held, or a release we never saw pressed
         held["down"] = pressed
-        bridge.set_listening(pressed)
+        if bridge.set_listening(pressed) and on_change is not None:
+            on_change(pressed)
 
     return keyboard.hook(on_event, suppress=False)
 
