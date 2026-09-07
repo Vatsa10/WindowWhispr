@@ -12,6 +12,7 @@ import json
 import urllib.error
 import urllib.request
 import wave
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -255,3 +256,124 @@ def test_the_module_graph_resolves(server):
     for imported in {"/static/app.js"}:
         assert imported.encode() in ui
         assert client.get(imported)[0] == 200
+
+
+def test_every_id_ui_js_looks_up_exists_in_the_page(server):
+    """getElementById silently returns null; a stale id turns into a runtime
+    TypeError the first time the page is touched, not at load time."""
+    import re
+
+    _web, client = server
+    _status, ui = client.get("/static/ui.js")
+    ids_wanted = set(re.findall(r'getElementById\(["\']([^"\']+)["\']\)', ui.decode()))
+    assert ids_wanted, "no getElementById calls found — pattern may be stale"
+
+    _status, page = client.get("/")
+    html = page.decode()
+    ids_present = set(re.findall(r'\bid=["\']([^"\']+)["\']', html))
+
+    missing = ids_wanted - ids_present
+    assert not missing, f"ui.js looks up ids missing from index.html: {missing}"
+
+
+def test_index_html_has_no_emoji():
+    """An emoji pasted in as a stand-in icon renders inconsistently across
+    platforms and is invisible to a screen reader; icons belong in the SVG
+    sprite instead."""
+    import re
+
+    html = (Path(__file__).parent.parent / "core/web/static/index.html").read_text(
+        encoding="utf-8")
+
+    emoji_pattern = re.compile(
+        "["
+        "\U0001F000-\U0001FFFF"
+        "\U00002600-\U000027BF"
+        "\U0001F1E6-\U0001F1FF"
+        "\U00002190-\U000021FF"
+        "\U00002B00-\U00002BFF"
+        "\U0000FE00-\U0000FE0F"
+        "]"
+    )
+    found = emoji_pattern.findall(html)
+    assert not found, f"emoji found in index.html: {found}"
+
+
+def test_viewport_meta_does_not_disable_zoom(server):
+    """A pinch-to-zoom-disabling viewport tag is an accessibility failure for
+    anyone who needs to enlarge text on a phone."""
+    import re
+
+    _web, client = server
+    _status, body = client.get("/")
+    html = body.decode()
+
+    match = re.search(r'<meta\s+name=["\']viewport["\']\s+content=["\']([^"\']+)["\']', html)
+    assert match, "no viewport meta tag found"
+    content = match.group(1)
+    assert "user-scalable=no" not in content.replace(" ", "")
+    assert "maximum-scale=1" not in content.replace(" ", "")
+
+
+def test_status_element_keeps_its_accessibility_attributes(server):
+    """A status line without role/aria-live is silent to screen reader users
+    even though sighted users see the text update fine."""
+    import re
+
+    _web, client = server
+    _status, body = client.get("/")
+    html = body.decode()
+
+    match = re.search(r'<[^>]+\bid=["\']status["\'][^>]*>', html)
+    assert match, "no element with id=\"status\" found"
+    tag = match.group(0)
+    assert 'role="status"' in tag, f"status element lost role=\"status\": {tag}"
+    assert "aria-live" in tag, f"status element lost aria-live: {tag}"
+
+
+def test_every_checkbox_has_a_bound_label(server):
+    """A label that merely surrounds a checkbox visually still works with a
+    mouse, but a label bound with `for` is what lets a screen reader or a tap
+    on the text itself toggle the box."""
+    import re
+
+    _web, client = server
+    _status, body = client.get("/")
+    html = body.decode()
+
+    checkbox_ids = re.findall(
+        r'<input[^>]*\btype=["\']checkbox["\'][^>]*\bid=["\']([^"\']+)["\']', html)
+    checkbox_ids += re.findall(
+        r'<input[^>]*\bid=["\']([^"\']+)["\'][^>]*\btype=["\']checkbox["\']', html)
+    checkbox_ids = set(checkbox_ids)
+    assert checkbox_ids, "no checkboxes found — page may have changed shape"
+
+    label_fors = set(re.findall(r'<label[^>]*\bfor=["\']([^"\']+)["\']', html))
+    missing = checkbox_ids - label_fors
+    assert not missing, f"checkboxes with no label bound by for=: {missing}"
+
+
+def test_stylesheet_defines_both_colour_schemes_and_reduced_motion():
+    """Dropping the light-scheme override or the reduced-motion block is
+    invisible on the developer's own dark, motion-tolerant machine."""
+    css = (Path(__file__).parent.parent / "core/web/static/style.css").read_text(
+        encoding="utf-8")
+    assert "prefers-color-scheme: light" in css
+    assert "prefers-reduced-motion" in css
+
+
+def test_every_svg_icon_use_points_at_a_defined_symbol(server):
+    """<use href="#id"> pointing at a symbol id that does not exist renders
+    nothing at all, with no error anywhere a developer would see it."""
+    import re
+
+    _web, client = server
+    _status, body = client.get("/")
+    html = body.decode()
+
+    referenced = set(re.findall(r'<use\s+href=["\']#([^"\']+)["\']', html))
+    assert referenced, "no <use href=\"#...\"> icon references found"
+    defined = set(re.findall(r'<symbol\s+id=["\']([^"\']+)["\']', html))
+
+    missing = referenced - defined
+    assert not missing, f"<use> references undefined symbols: {missing}"
