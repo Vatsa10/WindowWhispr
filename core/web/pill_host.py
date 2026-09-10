@@ -160,6 +160,10 @@ def run(url: str, corner: str = DEFAULT_CORNER) -> None:
         frameless=True,
         easy_drag=True,      # no title bar, so the pill itself is the handle
         on_top=True,
+        # pywebview defaults this to (200, 100), which silently clamps every
+        # resize: the dot rendered inside a 200x100 panel because the window
+        # never shrank to fit it.
+        min_size=(1, 1),
         # Not transparent: WebView2 has no transparent backdrop on Windows and
         # asking for one leaves white corners behind a rounded pill.
         background_color="#0F172A",
