@@ -4,116 +4,138 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>WinWhispr</title>
+<link rel="preload" href="/static/vendor/geist.woff2" as="font" type="font/woff2" crossorigin>
 <style>
   /* The pill.
    *
-   * Same language as the app window -- one hard outline, one offset shadow --
-   * but dark, because it floats over whatever you are working in and a paper
-   * lozenge would read as a stray dialog. The shadow is what separates it from
-   * the desktop underneath without a drop-shadow blur, which WebView2 would
-   * clip at the window edge anyway.
+   * It cannot be hidden -- Chromium freezes an occluded renderer and a frozen
+   * renderer hears nothing -- so idle is the smallest thing that still counts
+   * as visible: a dot in a corner, at a third opacity. It grows into a real
+   * pill only while there is something to say, and shrinks back after.
+   *
+   * The window is painted the same colour as the pill because WebView2 has no
+   * transparent backdrop on Windows; anything showing through would be white.
    */
   @font-face {
-    font-family: "Space Grotesk";
-    src: url("/static/vendor/space-grotesk.woff2") format("woff2");
-    font-weight: 400 700;
+    font-family: "Geist";
+    src: url("/static/vendor/geist.woff2") format("woff2");
+    font-weight: 100 900;
     font-display: swap;
   }
   @font-face {
-    font-family: "Inter";
-    src: url("/static/vendor/inter.woff2") format("woff2");
+    font-family: "Geist Mono";
+    src: url("/static/vendor/geist-mono.woff2") format("woff2");
     font-weight: 100 900;
     font-display: swap;
   }
 
   :root {
     color-scheme: dark;
-    --ink: #1a1a1a;
-    --panel: #1e293b;
-    --panel-2: #273548;
-    --paper: #f5f0e8;
-    --yellow: #ffcc00;
-    --green: #22c55e;
-    --red: #e63b2e;
-    --muted: #94a3b8;
+    --bg: #0f172a;
+    --surface: #16203a;
+    --surface-2: #1e293b;
+    --border: #2e3c56;
+    --fg: #f8fafc;
+    --fg-2: #94a3b8;
+    --fg-3: #64748b;
+    --live: #22c55e;
+    --bad: #ef4444;
+    --ease: cubic-bezier(.2, .8, .3, 1);
   }
   * { box-sizing: border-box; }
-  html, body { height: 100%; }
+  html, body, #root { height: 100%; }
   body {
     margin: 0; overflow: hidden;
-    /* The window is painted this colour too: WebView2 has no transparent
-       backdrop on Windows, so anything showing through would be white. */
-    background: var(--ink);
-    color: var(--paper);
-    font-family: "Inter", system-ui, "Segoe UI", sans-serif;
-    font-size: 12.5px;
+    background: var(--bg); color: var(--fg);
+    font-family: "Geist", system-ui, "Segoe UI", sans-serif;
+    font-size: 12.5px; line-height: 1.4;
     user-select: none; cursor: default;
   }
 
-  #root { height: 100%; }
-  .pill {
-    position: absolute; inset: 0 4px 4px 0;
-    display: flex; align-items: center; gap: 10px;
-    padding: 0 12px;
-    background: var(--panel);
-    border: 2px solid var(--paper);
-    box-shadow: 4px 4px 0 var(--yellow);
-  }
-  body.state-error .pill { box-shadow: 4px 4px 0 var(--red); }
-  body.state-live .pill { box-shadow: 4px 4px 0 var(--green); }
+  /* --- the dot ---------------------------------------------------------- */
 
-  .dot { width: 9px; height: 9px; flex: none; border: 1px solid var(--paper); background: #64748b; }
-  .dot.live { background: var(--green); animation: blink 1.2s steps(2, end) infinite; }
-  .dot.busy { background: var(--yellow); }
-  .dot.error { background: var(--red); }
-  @keyframes blink { 50% { opacity: .2; } }
-  @media (prefers-reduced-motion: reduce) { .dot.live { animation: none; } }
+  /* Idle. Faint enough to stop noticing, solid enough that the window is not
+     occluded, which is the line the recognizer depends on. */
+  .dot-wrap {
+    position: absolute; inset: 0;
+    display: grid; place-items: center;
+    opacity: .38;
+    transition: opacity var(--fast, 140ms) var(--ease);
+  }
+  .dot-wrap:hover { opacity: 1; }
+  .dot-core {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--fg-3);
+    box-shadow: 0 0 0 1px #0f172a, 0 0 0 2px #ffffff22;
+  }
+  .dot-core.live { background: var(--live); animation: breathe 1.3s var(--ease) infinite; }
+  .dot-core.busy { background: var(--fg-2); }
+  .dot-core.error { background: var(--bad); }
+  @keyframes breathe { 50% { opacity: .3; transform: scale(.7); } }
+  @media (prefers-reduced-motion: reduce) { .dot-core.live { animation: none; } }
+
+  /* --- the pill --------------------------------------------------------- */
+
+  .pill {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; gap: 10px;
+    padding: 0 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+  }
+  body.state-live .pill { border-color: #22c55e66; }
+  body.state-error .pill { border-color: #ef444466; }
+
+  .led { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--fg-3); }
+  .led.live { background: var(--live); animation: breathe 1.3s var(--ease) infinite; }
+  .led.busy { background: var(--fg-2); }
+  .led.error { background: var(--bad); }
+  @media (prefers-reduced-motion: reduce) { .led.live { animation: none; } }
 
   .lines { min-width: 0; flex: 1; }
   .state {
-    font-family: "Space Grotesk", sans-serif;
-    font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+    font-size: 12.5px; font-weight: 500;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .detail {
-    color: var(--muted); font-size: 11.5px; margin-top: 1px;
+    color: var(--fg-2); font-size: 11.5px; margin-top: 1px;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
-  /* Idle is a lozenge the width of a word: the second line would not fit and
-     has nothing to say. */
-  body.size-idle .detail { display: none; }
 
-  /* Before the microphone is granted the whole pill is the button: there is no
-     room in it for a button beside anything else. */
+  /* --- overlays --------------------------------------------------------- */
+
   .overlay {
-    position: absolute; inset: 0 4px 4px 0;
+    position: absolute; inset: 0;
     display: flex; align-items: center; justify-content: center; gap: 8px;
-    background: var(--yellow); color: var(--ink);
-    border: 2px solid var(--ink); box-shadow: 4px 4px 0 var(--paper);
+    background: var(--surface);
+    border: 1px solid var(--border); border-radius: 14px;
   }
-  .overlay[hidden] { display: none; }
+  /* Before the microphone is granted the whole pill is the button: there is
+     no room in it for a button beside anything else. */
+  .overlay.arm { border: 0; background: transparent; color: var(--fg); }
+  .overlay.menu { flex-direction: column; padding: 10px; }
 
   button {
-    border: 2px solid var(--ink);
-    background: var(--paper); color: var(--ink);
-    font-family: "Space Grotesk", sans-serif;
-    font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em;
+    border: 1px solid var(--border); border-radius: 8px;
+    background: var(--surface-2); color: var(--fg);
+    font: inherit; font-size: 12.5px; font-weight: 500;
     cursor: pointer; padding: 9px 12px;
-    box-shadow: 2px 2px 0 var(--ink);
-    transition: transform 120ms cubic-bezier(.2,.8,.3,1), box-shadow 120ms cubic-bezier(.2,.8,.3,1);
+    transition: background 140ms var(--ease), border-color 140ms var(--ease),
+                transform 140ms var(--ease);
   }
-  button:active { transform: translate(2px, 2px); box-shadow: none; }
-  .overlay.arm {
+  button:hover { background: #273449; border-color: #3d4f70; }
+  button:active { transform: scale(.98); }
+  button:focus-visible { outline: 2px solid var(--live); outline-offset: 2px; }
+  .overlay.arm button {
     position: absolute; inset: 0; width: 100%; height: 100%;
-    border: 0; background: transparent; box-shadow: none;
+    border-radius: 14px;
   }
-  .overlay.arm:active { transform: none; }
-  .overlay.menu { flex-direction: column; padding: 10px; background: var(--paper); }
   .overlay.menu button { width: 100%; }
-  .overlay .quit { background: var(--red); color: #fff; }
+  .overlay.menu .quit { background: #ef44441c; border-color: #7f1d1d; color: #f87171; }
 </style>
 </head>
-<body class="size-arm">
+<body class="size-arm state-idle">
 <div id="root"></div>
 <!-- Vendored, and UMD, so they must load before the module that wraps them. -->
 <script src="/static/vendor/react.js"></script>

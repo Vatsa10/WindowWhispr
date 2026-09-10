@@ -7,8 +7,10 @@
 
 import { html, ReactDOM, useCallback, useEffect, useRef, useState } from "/static/app/react.js";
 import {
-  Button, Card, Dialog, Empty, Field, Icon, Metric, Select, Skeleton, Switch, TextInput,
+  Button, Card, Dialog, Empty, Field, Icon, KeyCapture, Metric, Select, Skeleton,
+  Switch, TextInput,
 } from "/static/app/ui.js";
+import { describeKey } from "/static/app/keys.js";
 
 const SAVE_DEBOUNCE_MS = 300;
 const TOAST_MS = 3200;
@@ -106,70 +108,65 @@ function useSettings(notify) {
 // --- views ------------------------------------------------------------------
 
 function Dictation({ config, choices, set }) {
-  const browser = config.speech_engine !== "local";
+  const suggestions = choices.keys || [];
+  const describe = useCallback(
+    (name) => describeKey(name, suggestions), [suggestions]);
+
   return html`<div>
     <p class="view-lede">Hold your talk key in any application, speak, and let
       go. The words are cleaned up and typed where your cursor already was.</p>
 
-    <${Card} icon="mic" title="Speech engine"
-      hint="The browser engine needs no download and works straight away, but it
-            sends audio to Microsoft's speech service and needs an internet
-            connection. The local model works with no network at all and keeps
-            every word on this machine, after a one-time download.">
+    <${Card} icon="mic" title="Language"
+      hint="Set once. WinWhispr uses the speech engine already on this PC, so
+            there is nothing to download when you change it.">
       <div class="grid">
-        <${Field} label="Engine" id="engine">
-          <${Select} id="engine" value=${config.speech_engine}
-            onChange=${(v) => set("speech_engine", v)}
-            options=${[
-              { value: "browser", label: "Browser — instant, nothing to download" },
-              { value: "local", label: "This machine — fully offline" },
-            ]} />
-        <//>
-        ${browser && html`<${Field} label="Language"
-          help="Set once. Applies to the browser engine." id="lang">
+        <${Field} label="Dictation language" id="lang">
           <${Select} id="lang" value=${config.speech_language}
             onChange=${(v) => set("speech_language", v)}
             options=${(choices.languages || []).map((l) => ({ value: l.tag, label: l.name }))} />
-        <//>`}
+        <//>
       </div>
     <//>
 
-    ${!browser && html`<${Card} title="Local model"
-      hint="Automatic sizes the model to this machine, then measures it and drops
-            to a smaller one if it turns out too slow.">
+    <${Card} title="Keys"
+      hint="Right Ctrl is the default because nothing else uses it. Plenty of
+            laptops do not have one, so press Change and hit whichever key you
+            never reach for.">
       <div class="grid">
-        <${Field} label="Model" id="model">
-          <${Select} id="model" value=${config.asr_model}
-            onChange=${(v) => set("asr_model", v)}
-            options=${(choices.models || []).map((m) => ({ value: m, label: m }))} />
+        <${Field} label="Talk key" help="Hold it to dictate.">
+          <${KeyCapture} value=${config.ptt_key} describe=${describe}
+            suggestions=${suggestions}
+            onChange=${(v) => set("ptt_key", v)} />
         <//>
-        <${Field} label="Compute device" id="device">
-          <${Select} id="device" value=${config.asr_device}
-            onChange=${(v) => set("asr_device", v)}
-            options=${(choices.devices || []).map((d) => ({ value: d, label: d }))} />
+        <${Field} label="Cancel key" help="Throws away what you just said.">
+          <${KeyCapture} value=${config.cancel_key} describe=${describe}
+            onChange=${(v) => set("cancel_key", v)} />
         <//>
       </div>
-    <//>`}
-
-    <${Card} title="Keys">
-      <div class="grid">
-        <${Field} label="Talk key" help="Hold it to dictate." id="ptt">
-          <${TextInput} id="ptt" value=${config.ptt_key}
-            onChange=${(v) => set("ptt_key", v)} placeholder="right ctrl" />
-        <//>
-        <${Field} label="Cancel key" help="Throws the recording away." id="cancel">
-          <${TextInput} id="cancel" value=${config.cancel_key}
-            onChange=${(v) => set("cancel_key", v)} placeholder="esc" />
-        <//>
-      </div>
-      <div style=${{ marginTop: "8px" }}>
+      <div style=${{ marginTop: "12px" }}>
         <${Switch} id="doubletap" checked=${config.hands_free_double_tap}
           onChange=${(v) => set("hands_free_double_tap", v)}
-          title="Tap twice to keep recording"
-          help="Hands-free, so a long dictation does not mean a held key." />
+          title="Tap twice to keep listening"
+          help="Hands-free, so a long dictation is not a held key. Tap once more to stop." />
         <${Switch} id="sound" checked=${config.sound_on_start}
           onChange=${(v) => set("sound_on_start", v)}
           title="Sound when recording starts" />
+      </div>
+    <//>
+
+    <${Card} title="Where the dot sits"
+      hint="WinWhispr keeps a small dot on screen while it waits. It has to
+            stay visible to keep listening, so put it somewhere you do not
+            look. It grows into a pill only while you are speaking.">
+      <div class="grid">
+        <${Field} label="Corner" id="corner">
+          <${Select} id="corner" value=${config.pill_corner}
+            onChange=${(v) => set("pill_corner", v)}
+            options=${(choices.corners || []).map((c) => ({
+              value: c,
+              label: c.split("-").map((w) => w[0].toUpperCase() + w.slice(1)).join(" "),
+            }))} />
+        <//>
       </div>
     <//>
   </div>`;
@@ -375,81 +372,42 @@ function Activity({ notify }) {
 }
 
 function Storage({ config, set, notify }) {
-  const [models, setModels] = useState(null);
-  const [confirming, setConfirming] = useState(null);
-
-  useEffect(() => {
-    ask("models").then((d) => setModels(d.models)).catch((err) => notify(err.message, "bad"));
-  }, [notify]);
-
-  const remove = async (name) => {
-    setConfirming(null);
-    try {
-      setModels((await ask("model_remove", { name })).models);
-      notify("Deleted");
-    } catch (err) { notify(err.message, "bad"); }
-  };
+  const [confirming, setConfirming] = useState(false);
 
   const wipe = async () => {
-    setConfirming(null);
+    setConfirming(false);
     try { await ask("reset"); notify("Erased"); }
     catch (err) { notify(err.message, "bad"); }
   };
 
-  const size = (mb) => (mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${Math.round(mb)} MB`);
-
   return html`<div>
-    <p class="view-lede">Models downloaded to this machine. Deleting one frees
-      the space; it downloads again if you pick it later.</p>
+    <p class="view-lede">What WinWhispr keeps on this machine, and how it starts.</p>
 
-    <${Card} icon="drive" title="Downloaded models">
-      ${models === null
-        ? html`<${Skeleton} height=${58} />`
-        : models.length === 0
-        ? html`<${Empty}>Nothing downloaded — the browser engine needs no model.<//>`
-        : html`<div class="rows">
-            ${models.map((m) => html`<div class="rowitem" key=${m.name}>
-              <div class="rowitem-main">
-                <div class="rowitem-title">
-                  ${m.name} ${m.in_use && html`<span class="badge grey">in use</span>`}
-                </div>
-              </div>
-              <span class="rowitem-num">${size(m.size_mb)}</span>
-              <${Button} size="sm" icon="trash" disabled=${m.in_use}
-                onClick=${() => setConfirming({ kind: "model", name: m.name })}
-                aria-label=${`Delete ${m.name}`}>Delete<//>
-            </div>`)}
-          </div>`}
-    <//>
-
-    <${Card} title="Start with Windows">
+    <${Card} icon="drive" title="Start with Windows"
+      hint="WinWhispr is small and idle until you hold the talk key, so leaving
+            it running is what keeps the key always ready.">
       <div class="grid">
         <${Field} label="At login, start" id="startup">
           <${Select} id="startup" value=${config.startup_mode}
             onChange=${(v) => set("startup_mode", v)}
             options=${[
-              { value: "app", label: "The app" },
-              { value: "listen", label: "Browser dictation only" },
+              { value: "app", label: "WinWhispr" },
+              { value: "listen", label: "Dictation only, no settings window" },
             ]} />
         <//>
       </div>
     <//>
 
-    <${Card} title="Reset"
-      hint="Erases usage metrics and the activity log. Settings, the dictionary
-            and downloaded models are left alone.">
+    <${Card} title="Erase history"
+      hint="Deletes your usage figures and every transcript in the activity log.
+            Settings and your dictionary are left alone.">
       <${Button} variant="danger" icon="trash"
-        onClick=${() => setConfirming({ kind: "reset" })}>Erase metrics and log<//>
+        onClick=${() => setConfirming(true)}>Erase history<//>
     <//>
 
-    ${confirming && (confirming.kind === "reset"
-      ? html`<${Dialog} danger=${true} title="Erase your history?"
-          body="Usage metrics and every logged transcript are deleted. This cannot be undone."
-          confirm="Erase" onConfirm=${wipe} onCancel=${() => setConfirming(null)} />`
-      : html`<${Dialog} danger=${true} title=${`Delete ${confirming.name}?`}
-          body="It is removed from disk and downloads again if you pick it later."
-          confirm="Delete" onConfirm=${() => remove(confirming.name)}
-          onCancel=${() => setConfirming(null)} />`)}
+    ${confirming && html`<${Dialog} danger=${true} title="Erase all history?"
+      body="Your usage figures and every logged transcript are deleted. This cannot be undone."
+      confirm="Erase" onConfirm=${wipe} onCancel=${() => setConfirming(false)} />`}
   </div>`;
 }
 
@@ -473,7 +431,7 @@ function App() {
       <div style=${{ minWidth: 0 }}>
         <div class="brand-name">WinWhispr</div>
         <div class="brand-sub">
-          ${ready ? `Hold ${config.ptt_key || "right ctrl"} and speak` : "Starting…"}
+          ${ready ? `Hold ${describeKey(config.ptt_key, choices.keys)} to speak` : "Starting…"}
         </div>
       </div>
     </header>
@@ -482,7 +440,7 @@ function App() {
       <h1 class="topbar-title">${current.label}</h1>
       <span class="chip">
         <span class=${"led " + (ready ? "ok" : "busy")}></span>
-        ${!ready ? "Connecting" : config.speech_engine === "local" ? "Local model" : "Browser engine"}
+        ${ready ? "Ready" : "Connecting"}
       </span>
     </div>
 

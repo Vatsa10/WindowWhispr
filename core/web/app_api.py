@@ -29,6 +29,7 @@ WRITABLE = frozenset({
     "vad_threshold", "min_silence_ms", "max_segment_seconds",
     "input_device", "llm_model", "llm_device", "pill_enabled",
     "autolearn_enabled", "startup_mode", "history_retention_days",
+    "pill_corner",
 })
 
 #: Changing one of these means the engine has to be rebuilt.
@@ -48,6 +49,26 @@ def writable_changes(payload: dict) -> dict:
 
 def needs_restart(changes: dict) -> bool:
     return any(key in RESTARTS_ENGINE for key in changes)
+
+
+def _validated(changes: dict) -> dict:
+    """Drop changes that would leave the app unusable.
+
+    A talk key the hook cannot match does not raise anything -- dictation just
+    never starts again -- so a bad one is refused here rather than written.
+    """
+    from core.web.keys import DEFAULT_CANCEL_KEY, DEFAULT_TALK_KEY, is_usable
+    from core.web.pill_host import CORNERS
+
+    checked = dict(changes)
+    for key, fallback in (("ptt_key", DEFAULT_TALK_KEY),
+                          ("cancel_key", DEFAULT_CANCEL_KEY)):
+        if key in checked and not is_usable(str(checked[key])):
+            _log.warning("refusing unusable %s: %r", key, checked[key])
+            checked.pop(key)
+    if "pill_corner" in checked and checked["pill_corner"] not in CORNERS:
+        checked.pop("pill_corner")
+    return checked
 
 
 def _tz_offset_minutes() -> int:
@@ -76,6 +97,7 @@ class AppApi:
         from core.config_store import load_config, save_config
 
         changes = writable_changes(payload)
+        changes = _validated(changes)
         if not changes:
             return {"saved": False, "restart": False}
         merged = {**load_config(), **changes}
@@ -87,7 +109,9 @@ class AppApi:
     def choices(self) -> dict:
         """Everything the dropdowns need, gathered in one round trip."""
         from core.model_registry import list_model_names
+        from core.web.keys import SUGGESTED_TALK_KEYS
         from core.web.languages import LANGUAGES
+        from core.web.pill_host import CORNERS
 
         try:
             from core.processor import available_devices
@@ -100,6 +124,9 @@ class AppApi:
             "languages": [{"tag": tag, "name": name} for tag, name in LANGUAGES],
             "models": list(list_model_names()),
             "devices": devices,
+            "keys": [{"value": value, "label": label}
+                     for value, label in SUGGESTED_TALK_KEYS],
+            "corners": list(CORNERS),
         }
 
     # -- what happened ----------------------------------------------------

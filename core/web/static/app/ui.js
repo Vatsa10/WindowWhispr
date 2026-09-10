@@ -6,7 +6,8 @@
 // sets is the single most reliable way to make an interface look assembled
 // rather than designed.
 
-import { html } from "/static/app/react.js";
+import { html, useCallback, useEffect, useRef, useState } from "/static/app/react.js";
+import { isUsable, keyName } from "/static/app/keys.js";
 
 const PATHS = {
   mic: ["M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z", "M19 10v2a7 7 0 0 1-14 0v-2", "M12 19v3"],
@@ -88,6 +89,58 @@ export function Button({ children, icon, variant = "", size = "", ...rest }) {
   return html`<button class=${`btn ${variant} ${size}`.trim()} type="button" ...${rest}>
     ${icon && html`<${Icon} name=${icon} size=${15} />`}${children}
   </button>`;
+}
+
+// Press a key, get that key. The only rebinding UI that works on a keyboard
+// this app has never seen -- a dropdown of key names cannot know whether the
+// laptop in front of you actually has a Right Ctrl.
+export function KeyCapture({ value, onChange, suggestions, describe }) {
+  const [listening, setListening] = useState(false);
+  const [rejected, setRejected] = useState("");
+  const box = useRef(null);
+
+  const stop = useCallback(() => { setListening(false); }, []);
+
+  useEffect(() => {
+    if (!listening) return undefined;
+    const onKey = (event) => {
+      // Every key, including Escape and Tab: while capturing, the keyboard
+      // belongs to this control. Escape cancels rather than binding.
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.key === "Escape") return stop();
+      const name = keyName(event);
+      if (!isUsable(name)) {
+        setRejected(name);
+        return;
+      }
+      setRejected("");
+      onChange(name);
+      stop();
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [listening, onChange, stop]);
+
+  return html`<div>
+    <div class="row" ref=${box}>
+      <span class=${"keycap" + (listening ? " listening" : "")}>
+        ${listening ? "Press a key…" : describe(value)}
+      </span>
+      <${Button} size="sm" onClick=${() => (listening ? stop() : setListening(true))}>
+        ${listening ? "Cancel" : "Change"}
+      <//>
+    </div>
+    ${rejected && html`<p class="field-help" role="alert" style=${{ marginTop: "6px" }}>
+      ${describe(rejected)} is needed for typing. Try a key you never use.
+    </p>`}
+    ${!listening && suggestions && html`<div class="row" style=${{ marginTop: "8px", gap: "6px" }}>
+      ${suggestions.filter((k) => k.value !== value).slice(0, 4).map((k) =>
+        html`<${Button} key=${k.value} size="sm" onClick=${() => onChange(k.value)}>
+          ${k.label}
+        <//>`)}
+    </div>`}
+  </div>`;
 }
 
 export function Metric({ value, label }) {

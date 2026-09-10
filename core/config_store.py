@@ -75,6 +75,10 @@ DEFAULT_CONFIG = {
     # on first run. "local" is the offline one.
     "speech_engine": "browser",
     "speech_language": "auto",
+    # Which corner the pill sits in. It cannot be hidden -- a frozen renderer
+    # hears nothing -- so the next best thing is letting people put it out of
+    # their own way.
+    "pill_corner": "bottom-right",
     # What "start at login" launches: the desktop app, or browser dictation.
     "startup_mode": "app",
     "sound_on_start": True,

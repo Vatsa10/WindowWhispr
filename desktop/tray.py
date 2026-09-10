@@ -115,6 +115,7 @@ class TrayApp:
             on_transcript=self._on_transcript,
             key=self._config.get("ptt_key", "right ctrl"),
         )
+        browser.corner = self._config.get("pill_corner", "bottom-right")
         browser.app_api = AppApi(on_config=self._on_config_changed)
         try:
             browser.start()

@@ -47,9 +47,25 @@ class _FakeChild:
 
 def _install(monkeypatch, server, child=None):
     monkeypatch.setattr(session, "build_hotkey_services", lambda **_: server)
-    monkeypatch.setattr(session, "spawn_pill", lambda url: child or _FakeChild())
+    monkeypatch.setattr(session, "spawn_pill",
+                        lambda url, corner="bottom-right": child or _FakeChild())
     monkeypatch.setattr("core.web.server._hook_hotkey",
                         lambda bridge, key, on_change=None: None)
+
+
+def test_the_pill_is_opened_in_the_corner_the_user_chose(monkeypatch):
+    """It cannot be hidden, so where it sits is the only comfort on offer."""
+    seen = {}
+    monkeypatch.setattr(session, "build_hotkey_services", lambda **_: _FakeServer())
+    monkeypatch.setattr(session, "spawn_pill",
+                        lambda url, corner="bottom-right": seen.setdefault("corner", corner)
+                        or _FakeChild())
+    monkeypatch.setattr("core.web.server._hook_hotkey",
+                        lambda bridge, key, on_change=None: None)
+    dictation = BrowserDictation(port=9100)
+    dictation.corner = "top-left"
+    dictation.start()
+    assert seen["corner"] == "top-left"
 
 
 def test_starting_binds_hooks_and_opens_the_window(monkeypatch):

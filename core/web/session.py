@@ -42,6 +42,8 @@ class BrowserDictation:
         self._port = port
         #: The settings screen's data surface. Assign before ``start()``.
         self.app_api = None
+        #: Which corner the pill sits in.
+        self.corner = "bottom-right"
         self._server = None
         self._child = None
         self._started_at = 0.0
@@ -68,7 +70,7 @@ class BrowserDictation:
             from core.web.server import _hook_hotkey
 
             _hook_hotkey(self._server.bridge, self._key, on_change=self._on_key)
-        self._child = spawn_pill(self.url)
+        self._child = spawn_pill(self.url, self.corner)
         _log.info("browser dictation on %s, key=%s", self.url, self._key)
 
     def _bind(self) -> int:

@@ -502,7 +502,7 @@ def _hook_hotkey(bridge, key: str = "right ctrl", on_change=None):
     return keyboard.hook(on_event, suppress=False)
 
 
-def spawn_pill(url: str):
+def spawn_pill(url: str, corner: str = "bottom-right"):
     """Start the recognizer window as a child process. Returns the process.
 
     A child rather than a thread: pywebview drives its own Win32 event loop
@@ -512,9 +512,9 @@ def spawn_pill(url: str):
     import sys
 
     if getattr(sys, "frozen", False):
-        argv = [sys.executable, "pill", url]
+        argv = [sys.executable, "pill", url, corner]
     else:
-        argv = [sys.executable, "-m", "core.web.pill_host", url]
+        argv = [sys.executable, "-m", "core.web.pill_host", url, corner]
     return subprocess.Popen(argv)
 
 

@@ -54,51 +54,35 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the internal design.
 - **Reset all data** button in the sidebar to wipe usage metrics and the
   activity log.
 
-## The browser's speech engine, inside the app
+## How it works
 
-This is the default, and there is nothing to set up: start WinWhispr, approve
-the microphone once on the pill, and hold **`Right Ctrl`** in any application.
-No model downloads and nothing loads, so it works the minute it is installed.
+There is nothing to set up. Start WinWhispr, approve the microphone once on
+the dot, and hold **`Right Ctrl`** in any application. Speak, let go, and your
+words are typed where your cursor already was. No model downloads and nothing
+loads, so it works the minute it is installed.
 
-The recognizer is Edge's, running in a small always-on-top pill at the bottom
-of the screen — started, watched and closed by the app itself. No browser is
-ever opened. Set the language once in **Dictation language** in the sidebar; it
-is picked up without a restart, and it stays set.
+The recognizer is Edge's, running in a window the app starts, watches and
+closes itself. No browser is ever opened.
 
-Switch to the local model any time in **Speech engine** in the sidebar: that
-one is fully offline, at the cost of a one-time download.
+**The dot.** While it waits, WinWhispr is a small dot in a corner you choose,
+at a third opacity. It grows into a pill while you speak and shrinks back a
+moment after your words are typed. Double-click it to open the app;
+right-click it to quit.
 
-Everything else is the same either way — the transcript is cleaned, snippets
-expand, and it lands in the activity log and your stats.
+> The dot has to stay on screen. Chromium freezes the renderer of a window
+> that is hidden or off-screen, and a frozen renderer hears nothing -- measured:
+> neither produced so much as an `onstart`, while a 16px window at 35% opacity
+> transcribed fine. Small is available; hidden is not.
 
-If you would rather run it without the desktop window:
+**If your laptop has no Right Ctrl**, plenty do not, open **Dictation**, press
+**Change**, and hit whichever key you never reach for. Right Alt, Caps Lock and
+Menu are offered as one-click suggestions. Keys you need for typing are
+refused rather than silently accepted.
 
-```powershell
-uv run python main.py listen
-```
+Set the language once in **Dictation**. It stays set.
 
-The pill is a lozenge the width of a word while it waits, grows while you
-speak, and shrinks again once the words have been typed. Right-click it to
-quit; drag it anywhere you prefer.
-
-> It stays on screen on purpose. Chromium freezes the renderer of a window
-> that is hidden or off-screen, and a frozen renderer hears nothing —
-> measured: neither produced so much as an `onstart`. Small is the answer;
-> hidden is not available.
-
-To have it running whenever you are, tick **Start WinWhispr with Windows** in
-the sidebar and set the dropdown under it to **Start browser dictation**. It
-stays up until you quit it from the pill.
-
-Two things to know before choosing this over the local model: the audio goes to
-Microsoft's speech service, so this mode is not offline; and it needs the
-WebView2 runtime, which ships with Windows 11 and installs with Edge on
-Windows 10.
-
-```powershell
-uv run python main.py listen --key "f13"    # a different talk key
-uv run python main.py listen --no-window    # use your own browser tab instead
-```
+Audio goes to Microsoft's speech service, so dictation needs an internet
+connection.
 
 ## Dictate from a browser
 

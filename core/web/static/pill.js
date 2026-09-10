@@ -67,7 +67,7 @@ function useRecognizer({ onStatus, onSize }) {
     const text = buffer.current.trim();
     buffer.current = "";
     if (!text) {
-      onSize("idle");
+      onSize("dot");
       return onStatus("idle", "Ready");
     }
     onSize("live");
@@ -80,7 +80,7 @@ function useRecognizer({ onStatus, onSize }) {
       // readable rather than vanishing with the window they were in.
       clearTimeout(shrinkTimer.current);
       shrinkTimer.current = setTimeout(() => {
-        if (!want.current) onSize("idle");
+        if (!want.current) onSize("dot");
       }, SHRINK_DELAY_MS);
     } catch (err) {
       onStatus("error", "Not connected", String(err.message || err));
@@ -165,7 +165,7 @@ function useRecognizer({ onStatus, onSize }) {
       await navigator.mediaDevices.getUserMedia({ audio: true });
       armed.current = true;
       setNeedsArming(false);
-      onSize("idle");
+      onSize("dot");
       onStatus("idle", "Ready");
       loadLanguage();
     } catch {
@@ -264,7 +264,7 @@ function Pill() {
 
   const closeMenu = useCallback(() => {
     setMenuOpen(false);
-    onSize("idle");
+    onSize("dot");
   }, [onSize]);
 
   useEffect(() => {
@@ -286,9 +286,19 @@ function Pill() {
     </button>`;
   }
 
-  return html`<div class="pill"
-    onDoubleClick=${() => bridge("open_app", location.origin + "/app")}>
-    <span class=${"dot " + status.kind}></span>
+  const openApp = () => bridge("open_app", location.origin + "/app");
+
+  // Idle is a dot. There is no room in it for a word, and after a day of
+  // seeing it there is no need for one either.
+  if (size === "dot") {
+    return html`<div class="dot-wrap" onDoubleClick=${openApp}
+      title=${`WinWhispr - ${status.label}`}>
+      <span class=${"dot-core " + status.kind}></span>
+    </div>`;
+  }
+
+  return html`<div class="pill" onDoubleClick=${openApp}>
+    <span class=${"led " + status.kind}></span>
     <div class="lines">
       <div class="state">${status.label}</div>
       <div class="detail" role="status" aria-live="polite">${status.detail}</div>

@@ -398,3 +398,22 @@ def test_caret_insertion_rules():
     spec = Path(__file__).parent / "insert_spec.mjs"
     result = subprocess.run([node, str(spec)], capture_output=True, text=True, timeout=60)
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_key_binding_rules():
+    """Turning a real key press into the name the hotkey hook matches on.
+
+    Same reasoning as the caret spec: this is JavaScript a browser runs, so it
+    is tested as JavaScript rather than as a Python translation of it.
+    """
+    import shutil
+    import subprocess
+    from pathlib import Path
+
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node is not installed; the JS assertions cannot run here")
+
+    spec = Path(__file__).parent / "keys_spec.mjs"
+    result = subprocess.run([node, str(spec)], capture_output=True, text=True, timeout=60)
+    assert result.returncode == 0, result.stdout + result.stderr
