@@ -18,7 +18,10 @@ which cannot share a process with Qt's.
 
 from __future__ import annotations
 
+import logging
 import sys
+
+_log = logging.getLogger("winwhispr.pill")
 
 #: (width, height) per state. ``dot`` is what it spends all day at.
 SIZES = {
@@ -86,10 +89,14 @@ class Api:
     def set_size(self, size: str) -> None:
         """Grow or shrink to the size for a state."""
         if self._window is None or size == self._size or size not in SIZES:
+            print(f"[pill] set_size({size!r}) ignored "
+                  f"(current={self._size!r}, bound={self._window is not None})",
+                  flush=True)
             return
         self._size = size
         width, height = SIZES[size]
         x, y = place(*self._screen, size=size, corner=self._corner)
+        print(f"[pill] set_size({size!r}) -> {width}x{height} at {x},{y}", flush=True)
         self._window.resize(width, height)
         self._window.move(x, y)
 
@@ -168,6 +175,7 @@ def run(url: str, corner: str = DEFAULT_CORNER) -> None:
         # asking for one leaves white corners behind a rounded pill.
         background_color="#0F172A",
     )
+    print(f"[pill] screen {width}x{height}, corner {corner}", flush=True)
     api.bind(window, (width, height), corner)
     # private_mode off: the microphone grant has to survive a restart, or the
     # user re-approves the mic every time the app starts.

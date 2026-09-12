@@ -20,14 +20,34 @@ const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 //: How long a finished transcript stays readable before the pill shrinks.
 const SHRINK_DELAY_MS = 2200;
 
+//: How long to wait for a window host before concluding there is not one.
+//: Only reached when the page is opened in an ordinary browser rather than by
+//: the app, where every bridge call is a no-op anyway.
+const NO_HOST_AFTER_MS = 8000;
+
 const token = new URLSearchParams(location.search).get("token")
   || localStorage.getItem("winwhispr-token")
   || "";
 if (token) localStorage.setItem("winwhispr-token", token);
 
-// The native bridge is optional. pywebview injects `window.pywebview.api`
-// only once the window is bound, and a build without a method simply does not
-// have it -- neither may take the UI down, so every call goes through here.
+// The native bridge is not there when the page first runs. pywebview injects
+// `window.pywebview.api` and then fires `pywebviewready`, which can be well
+// after React has mounted and asked for its first resize. Guessing at that
+// delay with a timer is how the window ended up stuck at the wrong size with
+// the right thing drawn inside it, so this waits for the event instead.
+//
+// Resolved immediately when the bridge is already there, because the event has
+// then already fired and will not fire again.
+export const bridgeReady = new Promise((resolve) => {
+  if (window.pywebview && window.pywebview.api) return resolve(true);
+  window.addEventListener("pywebviewready", () => resolve(true), { once: true });
+  // A page opened in an ordinary browser has no host and never will. Give up
+  // after a moment so nothing waits on it forever.
+  setTimeout(() => resolve(false), NO_HOST_AFTER_MS);
+});
+
+// Every call goes through here: a missing bridge, or a build without this
+// method, must never take the UI down.
 function bridge(method, ...args) {
   const api = window.pywebview && window.pywebview.api;
   const fn = api && api[method];
@@ -158,21 +178,37 @@ function useRecognizer({ onStatus, onSize }) {
     }
   }, []);
 
-  const arm = useCallback(async () => {
-    // The microphone prompt needs a click, and the grant is only remembered
-    // after one.
+  const arm = useCallback(async (silent) => {
+    // Try it without asking first. The window this runs in grants the
+    // microphone to its own page, so in the normal case there is nothing for
+    // the user to approve and no reason to make them tap a button every
+    // launch. The button only appears when this actually fails.
     try {
-      await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Release it immediately: the recognizer opens its own, and holding a
+      // second one lights the microphone-in-use indicator for no reason.
+      stream.getTracks().forEach((track) => track.stop());
       armed.current = true;
       setNeedsArming(false);
       onSize("dot");
       onStatus("idle", "Ready");
       loadLanguage();
+      return true;
     } catch {
-      onStatus("error", "Microphone blocked",
-        "Allow the microphone for this page and try again.");
+      if (!silent) {
+        onStatus("error", "Microphone blocked",
+          "Allow the microphone for this page and try again.");
+      }
+      return false;
     }
   }, [onStatus, onSize, loadLanguage]);
+
+  // On every launch, once. A failure here is not an error the user needs to
+  // see -- it just means the button stays up and they tap it.
+  useEffect(() => {
+    if (!Recognition) return;
+    arm(true);
+  }, [arm]);
 
   // The hotkey, arriving from the PC over server-sent events rather than a
   // poll: Chrome throttles timers in a background tab to once a minute, so a
@@ -247,7 +283,13 @@ function Pill() {
   }, [supported, needsArming, onStatus]);
 
   // The host process owns the geometry; this is the one place that tells it.
-  useEffect(() => { bridge("set_size", size); }, [size]);
+  // Waits for the bridge rather than assuming it, so the very first size --
+  // the one that shrinks the window to a dot -- is never the one that is lost.
+  useEffect(() => {
+    let cancelled = false;
+    bridgeReady.then(() => { if (!cancelled) bridge("set_size", size); });
+    return () => { cancelled = true; };
+  }, [size]);
 
   // The body carries both states: the pill's offset shadow changes colour with
   // status, and the idle size hides the second line.
@@ -281,9 +323,11 @@ function Pill() {
   }
 
   if (needsArming && supported) {
-    return html`<button class="overlay arm" type="button" onClick=${arm}>
-      Tap to enable the microphone
-    </button>`;
+    return html`<div class="overlay arm">
+      <button type="button" onClick=${() => arm(false)}>
+        Tap to enable the microphone
+      </button>
+    </div>`;
   }
 
   const openApp = () => bridge("open_app", location.origin + "/app");
