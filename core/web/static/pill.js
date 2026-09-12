@@ -25,6 +25,11 @@ const SHRINK_DELAY_MS = 2200;
 //: the app, where every bridge call is a no-op anyway.
 const NO_HOST_AFTER_MS = 8000;
 
+//: How long to let Chrome finish a take after being asked to stop, before
+//: aborting it outright. Long enough for a normal finalisation, short enough
+//: that a stuck recognizer does not look like a hung app.
+const STOP_GRACE_MS = 1200;
+
 const token = new URLSearchParams(location.search).get("token")
   || localStorage.getItem("winwhispr-token")
   || "";
@@ -80,12 +85,39 @@ function useRecognizer({ onStatus, onSize }) {
   const language = useRef("");
   const recognition = useRef(null);
   const shrinkTimer = useRef(0);
+  //: The part of the buffer already typed by streaming.
+  const streamed = useRef("");
+  //: start() has been called but onstart has not arrived. Calling start()
+  //: again in that window throws and desynchronises everything.
+  const starting = useRef(false);
+  const stopTimer = useRef(0);
 
   const [needsArming, setNeedsArming] = useState(true);
 
+  // Phrases typed already, so the release does not type them a second time.
+  const sendPhrase = useCallback((chunk) => {
+    const phrase = (chunk || "").trim();
+    if (!phrase) return;
+    streamed.current += chunk;
+    post("/api/stream", { text: phrase }).catch(() => {
+      // A failed phrase stays in the buffer, so the release still types it.
+      streamed.current = streamed.current.slice(0, -chunk.length);
+    });
+  }, []);
+
   const flush = useCallback(async () => {
-    const text = buffer.current.trim();
+    // Only what streaming did not already type: normally nothing, but a
+    // phrase the recognizer never finalised still has to reach the document.
+    const text = buffer.current.slice(streamed.current.length).trim();
+    const spoke = buffer.current.trim();
     buffer.current = "";
+    streamed.current = "";
+    if (!text && spoke) {
+      // Everything was typed as it was said. Say so rather than "nothing
+      // heard", which would be a lie about a take that worked.
+      onSize("dot");
+      return onStatus("idle", "Ready");
+    }
     if (!text) {
       onSize("dot");
       return onStatus("idle", "Ready");
@@ -107,16 +139,43 @@ function useRecognizer({ onStatus, onSize }) {
     }
   }, [onStatus, onSize]);
 
+  // `live` is set by the recognizer's own onstart/onend, never here. Setting
+  // it optimistically was the whole bug: start() throws if the recognizer is
+  // still running, the throw was swallowed, and `live` stayed false while the
+  // recognizer stayed on. After that the state was wrong forever -- releasing
+  // the key called flush() instead of stop(), so nothing ended, and the next
+  // press could not start anything either.
   const start = useCallback(() => {
-    if (live.current || !armed.current || !recognition.current) return;
+    if (live.current || starting.current || !armed.current || !recognition.current) {
+      return;
+    }
+    starting.current = true;
     try {
       recognition.current.start();
-      live.current = true;
     } catch {
-      // start() throws while a previous session is still unwinding; onend
-      // calls back here when it has.
+      // Already running: onend will arrive and drive the next decision.
+      starting.current = false;
     }
   }, []);
+
+  // Asking Chrome to stop is a request, not a guarantee -- it can sit there
+  // with the take open. Without this the pill stays green with the key long
+  // released and nothing ever typed.
+  const stop = useCallback(() => {
+    if (!recognition.current) return;
+    try {
+      recognition.current.stop();
+    } catch { /* not running */ }
+    clearTimeout(stopTimer.current);
+    stopTimer.current = setTimeout(() => {
+      if (!live.current || want.current) return;
+      try {
+        recognition.current.abort();   // abort always ends it
+      } catch { /* already gone */ }
+      live.current = false;
+      flush();
+    }, STOP_GRACE_MS);
+  }, [flush]);
 
   // Built once. Chrome ends a session on its own after a lull and after every
   // stop(), so restarting while the key is still held is what makes a long
@@ -132,12 +191,26 @@ function useRecognizer({ onStatus, onSize }) {
       let interim = "";
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const chunk = event.results[i][0].transcript;
-        if (event.results[i].isFinal) buffer.current += chunk;
-        else interim += chunk;
+        if (event.results[i].isFinal) {
+          buffer.current += chunk;
+          // Typed the moment the recognizer commits to it, so the words land
+          // in the document while you are still talking. Interim words are
+          // not sent: the recognizer revises those, and text already typed
+          // into somebody else's application cannot be taken back.
+          sendPhrase(chunk);
+        } else {
+          interim += chunk;
+        }
       }
       if (want.current) {
-        onStatus("live", "Listening", (buffer.current + interim).trim() || "…");
+        const heard = (buffer.current + interim).trim();
+        onStatus("live", "Listening", heard || "…");
       }
+    };
+
+    rec.onstart = () => {
+      starting.current = false;
+      live.current = true;
     };
 
     rec.onerror = (event) => {
@@ -152,7 +225,9 @@ function useRecognizer({ onStatus, onSize }) {
     };
 
     rec.onend = () => {
+      starting.current = false;
       live.current = false;
+      clearTimeout(stopTimer.current);
       if (want.current) start();
       else flush();
     };
@@ -162,7 +237,7 @@ function useRecognizer({ onStatus, onSize }) {
       rec.onend = null;   // do not restart a recognizer that is going away
       try { rec.abort(); } catch { /* already stopped */ }
     };
-  }, [onStatus, start, flush]);
+  }, [onStatus, start, flush, sendPhrase]);
 
   const loadLanguage = useCallback(async () => {
     try {
@@ -228,12 +303,16 @@ function useRecognizer({ onStatus, onSize }) {
       want.current = next;
       if (next) {
         buffer.current = "";
+        streamed.current = "";
         clearTimeout(shrinkTimer.current);
+        clearTimeout(stopTimer.current);
         onSize("live");
         onStatus("live", "Listening", "…");
         start();
-      } else if (live.current) {
-        recognition.current?.stop();
+      } else if (live.current || starting.current) {
+        // Still running, or still coming up: stop() covers both, because its
+        // watchdog fires whether or not onstart ever arrived.
+        stop();
       } else {
         flush();
       }

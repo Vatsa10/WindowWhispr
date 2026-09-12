@@ -167,6 +167,26 @@ class WebServer:
         self._paste(text)
         return {"pasted": True}
 
+    def stream(self, payload: dict) -> dict:
+        """Type one finished phrase while the key is still held.
+
+        Only phrases the recognizer has marked final are sent here. Interim
+        words are still being revised -- typing those would put text in the
+        document that the recognizer then changes its mind about, and there is
+        no taking it back out of somebody else's application.
+        """
+        text = (payload.get("text") or "").strip()
+        if not text:
+            return {"typed": False}
+        text = self.tidy({"text": text})["text"]
+        typed = False
+        if self.allow_paste and self._paste is not None:
+            typed = bool(self._paste(text + " "))
+        print(f"[stream] {len(text.split())} words, typed={typed}", flush=True)
+        if self.on_transcript is not None:
+            self.on_transcript(text)
+        return {"typed": typed, "text": text}
+
     def final(self, payload: dict) -> dict:
         """A finished utterance from the recognizer tab: clean it, type it.
 
@@ -181,6 +201,7 @@ class WebServer:
         pasted = False
         if self.allow_paste and self._paste is not None:
             pasted = bool(self._paste(text))
+        print(f"[final] {len(text.split())} words, pasted={pasted}", flush=True)
         if self.on_transcript is not None:
             self.on_transcript(text)
         return {"text": text, "pasted": pasted}
@@ -333,6 +354,8 @@ def _make_handler(server: WebServer):
                 return self._send_json(server.app(payload))
             if path == "/api/show":
                 return self._send_json(server.show_app())
+            if path == "/api/stream":
+                return self._send_json(server.stream(payload))
             if path == "/api/final":
                 return self._send_json(server.final(payload))
             if path == "/api/paste":
@@ -506,7 +529,10 @@ def _hook_hotkey(bridge, key: str = "right ctrl", on_change=None):
         if pressed == held["down"]:
             return  # auto-repeat while held, or a release we never saw pressed
         held["down"] = pressed
-        if bridge.set_listening(pressed) and on_change is not None:
+        changed = bridge.set_listening(pressed)
+        print(f"[key] {key} {'down' if pressed else 'up'} "
+              f"published={changed} tabs={bridge.tabs}", flush=True)
+        if changed and on_change is not None:
             on_change(pressed)
 
     return keyboard.hook(on_event, suppress=False)

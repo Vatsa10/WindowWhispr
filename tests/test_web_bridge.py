@@ -223,3 +223,36 @@ def test_cleanup_on_removes_the_fillers(monkeypatch):
     tidied = web.tidy({"text": "um so we should uh ship it period"})["text"]
     assert "um" not in tidied.lower().split()
     assert tidied.endswith(".")
+
+
+# --- typing while you are still talking ----------------------------------
+
+
+def test_a_finished_phrase_is_typed_immediately():
+    typed = []
+    web = _server(paste=_recorder(typed), allow_paste=True)
+    result = web.stream({"text": "the quarterly review"})
+    assert result["typed"] is True
+    # A trailing space, or the next phrase runs into this one.
+    assert typed == ["THE QUARTERLY REVIEW "]
+
+
+def test_streaming_an_empty_phrase_types_nothing():
+    typed = []
+    web = _server(paste=_recorder(typed), allow_paste=True)
+    assert web.stream({"text": "   "}) == {"typed": False}
+    assert typed == []
+
+
+def test_a_streamed_phrase_is_cleaned_like_any_other():
+    web = _server()
+    assert web.stream({"text": "hello"})["text"] == "HELLO"
+
+
+def test_streamed_phrases_reach_the_activity_log():
+    """Otherwise a fully streamed take would never appear in your history."""
+    logged = []
+    web = _server()
+    web.on_transcript = logged.append
+    web.stream({"text": "one phrase"})
+    assert logged == ["ONE PHRASE"]

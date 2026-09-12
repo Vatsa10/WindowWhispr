@@ -69,7 +69,14 @@ class BrowserDictation:
         if self._key:
             from core.web.server import _hook_hotkey
 
-            _hook_hotkey(self._server.bridge, self._key, on_change=self._on_key)
+            try:
+                _hook_hotkey(self._server.bridge, self._key, on_change=self._on_key)
+                print(f"[hook] listening for {self._key!r}", flush=True)
+            except Exception as exc:
+                print(f"[hook] FAILED for {self._key!r}: {exc!r}", flush=True)
+                raise
+        else:
+            print("[hook] no key configured; serving windows only", flush=True)
         self._child = spawn_pill(self.url, self.corner)
         _log.info("browser dictation on %s, key=%s", self.url, self._key)
 

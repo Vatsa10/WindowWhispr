@@ -64,32 +64,18 @@
   .dot-wrap {
     position: absolute; inset: 0;
     display: grid; place-items: center;
-    opacity: .62;
+    opacity: .4;
     transition: opacity var(--fast, 140ms) var(--ease);
   }
   .dot-wrap:hover { opacity: 1; }
-
-  /* A status light, not a blob. At 18px there is room for exactly two things:
-     a dark body with a rim, and a lit core inside it. That reads as a device
-     that is switched on, where a flat grey circle reads as a rendering bug --
-     which is precisely how it was being read. */
   .dot-core {
     width: 100%; height: 100%; border-radius: 50%;
-    display: grid; place-items: center;
-    background: var(--surface-2);
-    box-shadow: inset 0 0 0 1.5px #ffffff33, 0 1px 3px #0009;
+    background: var(--fg-3);
+    box-shadow: inset 0 0 0 1px #ffffff2e;
   }
-  .dot-core::after {
-    content: ""; width: 40%; height: 40%; border-radius: 50%;
-    background: var(--fg-2);
-    transition: background var(--fast, 140ms) var(--ease);
-  }
-  .dot-core.live { background: var(--live); box-shadow: inset 0 0 0 1.5px #ffffff55, 0 1px 3px #0009; }
-  .dot-core.live::after { background: #06280f; }
-  .dot-core.busy::after { background: var(--fg); }
+  .dot-core.live { background: var(--live); animation: breathe 1.3s var(--ease) infinite; }
+  .dot-core.busy { background: var(--fg-2); }
   .dot-core.error { background: var(--bad); }
-  .dot-core.error::after { background: #3f0b0b; }
-  .dot-core.live { animation: breathe 1.3s var(--ease) infinite; }
   @keyframes breathe { 50% { opacity: .3; transform: scale(.7); } }
   @media (prefers-reduced-motion: reduce) { .dot-core.live { animation: none; } }
 
