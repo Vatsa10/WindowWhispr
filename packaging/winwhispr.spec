@@ -98,6 +98,8 @@ _hiddenimports += [
     "core.web.server",
     "core.web.bridge",
     "core.web.languages",
+    "core.web.corrections",
+    "core.web.keys",
     "core.web.pill_host",
     "core.web.session",
     "core.web.app_api",

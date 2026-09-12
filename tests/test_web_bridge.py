@@ -198,3 +198,28 @@ def test_double_click_raises_the_app():
 def test_asking_for_the_app_when_there_is_none_is_not_an_error():
     # "listen" mode has no desktop window; the pill must not break there.
     assert _server().show_app() == {"shown": False}
+
+
+# --- the whole path a transcript takes before it is typed ----------------
+
+
+def test_cleanup_can_be_turned_off(tmp_path, monkeypatch):
+    """Off means the words are typed exactly as they were heard."""
+    from core.web.server import build_hotkey_services
+
+    monkeypatch.setattr("core.config_store.load_config",
+                        lambda: {"cleanup_level": "none", "speech_language": "auto"})
+    web = build_hotkey_services(allow_paste=False)
+    spoken = "um so we should uh ship it"
+    assert web.tidy({"text": spoken})["text"] == spoken
+
+
+def test_cleanup_on_removes_the_fillers(monkeypatch):
+    from core.web.server import build_hotkey_services
+
+    monkeypatch.setattr("core.config_store.load_config",
+                        lambda: {"cleanup_level": "light", "speech_language": "auto"})
+    web = build_hotkey_services(allow_paste=False)
+    tidied = web.tidy({"text": "um so we should uh ship it period"})["text"]
+    assert "um" not in tidied.lower().split()
+    assert tidied.endswith(".")

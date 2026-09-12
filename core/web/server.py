@@ -452,9 +452,9 @@ def build_hotkey_services(allow_paste: bool = True):
     from core import paths, snippets
     from core.cleanup import deterministic
     from core.config_store import load_config
+    from core.dictionary import DictionaryStore
+    from core.web import corrections
     from core.web.languages import normalize
-
-    snippet_table = snippets.load(paths.snippets_path())
 
     def language() -> str:
         # Re-read rather than captured: the app is meant to stay running, and
@@ -462,7 +462,17 @@ def build_hotkey_services(allow_paste: bool = True):
         return normalize(load_config().get("speech_language", "auto"))
 
     def tidy(text: str) -> str:
-        return snippets.expand(deterministic.clean(text), snippet_table)
+        """Everything that happens to a transcript before it is typed.
+
+        Read from disk each time rather than captured at startup: a word added
+        to the dictionary, or cleanup switched off, has to take effect on the
+        next thing you say, not the next time the app restarts.
+        """
+        if load_config().get("cleanup_level", "light") != "none":
+            text = deterministic.clean(text)
+        entries = DictionaryStore(paths.dictionary_path()).load().entries()
+        text = corrections.apply(text, corrections.build_rules(entries))
+        return snippets.expand(text, snippets.load(paths.snippets_path()))
 
     paste = None
     if allow_paste:

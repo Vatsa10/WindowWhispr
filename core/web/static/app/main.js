@@ -173,33 +173,33 @@ function Dictation({ config, choices, set }) {
 }
 
 function Cleanup({ config, set }) {
+  const on = config.cleanup_level !== "none";
   return html`<div>
-    <p class="view-lede">Fillers removed, spoken punctuation applied, sentences
-      capitalized. If cleanup ever looks like it changed what you said, your raw
-      words are pasted instead — it can only improve the text, never lose it.</p>
+    <p class="view-lede">Speech comes out messy. WinWhispr tidies it before it
+      reaches your cursor, using fixed rules rather than a model, so the result
+      is the same every time and nothing is ever invented.</p>
 
-    <${Card} icon="sparkles" title="How much to change">
-      <div class="grid">
-        <${Field} label="Level" id="level">
-          <${Select} id="level" value=${config.cleanup_level}
-            onChange=${(v) => set("cleanup_level", v)}
-            options=${[
-              { value: "none", label: "None — paste exactly what was heard" },
-              { value: "light", label: "Light — fillers and punctuation" },
-              { value: "medium", label: "Medium — also tighten wording" },
-              { value: "high", label: "High — rewrite for brevity" },
-            ]} />
-        <//>
-        <${Field} label="Timeout" help="Milliseconds before it gives up and pastes the raw words." id="timeout">
-          <${TextInput} id="timeout" type="number" value=${config.cleanup_timeout_ms}
-            onChange=${(v) => set("cleanup_timeout_ms", Number(v) || 0)} />
-        <//>
-      </div>
-      <div style=${{ marginTop: "8px" }}>
-        <${Switch} id="perapp" checked=${config.per_app_formatting}
-          onChange=${(v) => set("per_app_formatting", v)}
-          title="Match the app I am typing into"
-          help="An email reads differently from a chat message." />
+    <${Card} icon="sparkles" title="Tidy up what I say">
+      <${Switch} id="tidy" checked=${on}
+        onChange=${(v) => set("cleanup_level", v ? "light" : "none")}
+        title="Clean up transcripts"
+        help="Turn this off to have your words typed exactly as they were heard." />
+    <//>
+
+    <${Card} title="What it does">
+      <div class="rows">
+        ${[
+          ["Removes fillers", "“um”, “uh”, “you know”, and repeated words"],
+          ["Applies spoken punctuation", "say “comma” or “new line” and you get one"],
+          ["Capitalises sentences", "and fixes the spacing around punctuation"],
+          ["Uses your dictionary", "names it keeps mishearing, from the Dictionary tab"],
+          ["Expands your snippets", "say a trigger, get the whole block"],
+        ].map(([title, sub]) => html`<div class="rowitem" key=${title}>
+          <div class="rowitem-main">
+            <div class="rowitem-title">${title}</div>
+            <div class="rowitem-sub">${sub}</div>
+          </div>
+        </div>`)}
       </div>
     <//>
   </div>`;

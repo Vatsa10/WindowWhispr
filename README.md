@@ -1,302 +1,231 @@
 # WinWhispr
 
-WinWhispr is offline dictation for Windows. Hold a key, speak, and your words
-are typed into whatever application has focus.
+Talk instead of typing. Hold a key, say your sentence, let go, and the words
+appear wherever your cursor already was — in an email, a chat, a document, a
+form, anything.
 
-It comes two ways:
+There is no model to download and nothing to configure. It works the minute it
+is installed.
 
-- **A desktop app** that lives in the system tray, transcribing on this machine
-  with Whisper. Nothing leaves the computer.
-- **A browser page** you can open from your phone or another laptop, which uses
-  the browser's own speech engine where it has one. See
-  [Dictate from a browser](#dictate-from-a-browser).
+---
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the internal design.
+## Getting started
 
-## Features
+**1. Start WinWhispr.** A small button appears near the corner of your screen
+saying *Tap to enable the microphone*. Tap it once and allow the microphone.
+You only ever do this once.
 
-- **Standalone native Windows app** — PySide6 (Qt) desktop window, dark theme.
-  No browser, no WebView, no web toolchain.
-- **System tray + collapsible settings sidebar**; runs in the background.
-- **Two keys, that's it**: hold **`Right Ctrl`** and speak, let go and your
-  words appear. **`Esc`** throws the recording away. (Tap-twice-to-lock and a
-  press-on/press-off combo exist too, both off by default.)
-- **Floating status pill** near the bottom of the screen — a live waveform while
-  recording, "Cleaning up…" while it thinks, and the specific problem when
-  something goes wrong.
-- Microphone capture at 16 kHz, mono, `float32`.
-- Voice-activity chunking with **Silero VAD** (ONNX).
-- **Speech-to-text sized to your machine.** The default inspects the hardware
-  and picks a local Whisper model, then measures it and drops to a smaller one
-  if it is too slow. Cloud (Groq) is available but off by default. See
-  [Supported models](#supported-models).
-- **Automatic cleanup** of the finished transcript by a local LLM: fillers gone,
-  spoken self-corrections resolved ("meet at 2, actually 3" → "3"), spoken
-  punctuation and lists applied, tone matched to the app you are typing into.
-  Four levels (None / Light / Medium / High); Light is the default.
-- **Deterministic safety gates** on every cleanup: if the model answers your
-  dictation, drops a phone number or URL, deletes too much, or rewrites past the
-  level's limit, WinWhispr pastes your **raw words** instead. Cleanup can only
-  improve the text — it can never lose it.
-- **Personal dictionary** for names and terms recognition keeps missing, used as
-  a spelling authority rather than a blind find-and-replace. It can optionally
-  **learn a name** when you correct one right after pasting (off by default).
-- **Snippets** (say a trigger, paste a block) and trailing spoken commands
-  ("…press enter").
-- Injects recognized text into **whatever app currently has focus** and logs it.
-- Optional **clipboard reformatter** — a small local LLM cleans up selected text
-  on a second hotkey (`Ctrl+Alt+R`).
-- **Paste / copy the last transcript** again with `Ctrl+Alt+V` / `Ctrl+Alt+C`.
-- Usage analytics in SQLite — words dictated, words per minute (and your best),
-  day streak, and time saved versus typing — plus a searchable activity log.
-- **Can run fully offline** — pick the local ASR model and local cleanup, and
-  nothing leaves the machine after the one-time model download.
-- **Reset all data** button in the sidebar to wipe usage metrics and the
-  activity log.
+**2. The button shrinks to a dot.** That dot is WinWhispr waiting. It sits in
+the corner, faint, out of your way.
 
-## How it works
+**3. Click into anything you can type in.** An email, a search box, a document.
 
-There is nothing to set up. Start WinWhispr, approve the microphone once on
-the dot, and hold **`Right Ctrl`** in any application. Speak, let go, and your
-words are typed where your cursor already was. No model downloads and nothing
-loads, so it works the minute it is installed.
+**4. Hold `Right Ctrl`, say a sentence, and let go.** The dot grows into a pill
+while you speak so you can see it is listening, and your words are typed at
+your cursor a moment after you release the key.
 
-The recognizer is Edge's, running in a window the app starts, watches and
-closes itself. No browser is ever opened.
+That is the whole thing.
 
-**The dot.** While it waits, WinWhispr is a small dot in a corner you choose,
-at a third opacity. It grows into a pill while you speak and shrinks back a
-moment after your words are typed. Double-click it to open the app;
-right-click it to quit.
+> **No Right Ctrl on your laptop?** Plenty do not have one. Open WinWhispr,
+> go to **Dictation**, press **Change** next to *Talk key*, and hit whichever
+> key you never use. Right Alt, Caps Lock and Menu are one tap away.
 
-> The dot has to stay on screen. Chromium freezes the renderer of a window
-> that is hidden or off-screen, and a frozen renderer hears nothing -- measured:
-> neither produced so much as an `onstart`, while a 16px window at 35% opacity
-> transcribed fine. Small is available; hidden is not.
+---
 
-**If your laptop has no Right Ctrl**, plenty do not, open **Dictation**, press
-**Change**, and hit whichever key you never reach for. Right Alt, Caps Lock and
-Menu are offered as one-click suggestions. Keys you need for typing are
-refused rather than silently accepted.
+## The dot
 
-Set the language once in **Dictation**. It stays set.
+WinWhispr is a dot in the corner of your screen whenever it is not being used.
 
-Audio goes to Microsoft's speech service, so dictation needs an internet
-connection.
+| It looks like | It means |
+| --- | --- |
+| A faint grey dot | Waiting. Hold your talk key to start. |
+| A green pill, pulsing | Listening. Your words appear in it as you speak. |
+| A grey pill saying *Typing…* | Sending the words to your cursor. |
+| A red dot | Something is wrong. Hover it to read what. |
 
-## Dictate from a browser
+- **Double-click the dot** to open WinWhispr's window.
+- **Right-click it** for *Quit* and *Keep running*.
+- **Drag it** anywhere you like, or set its corner in **Dictation**.
 
-```powershell
-uv run python main.py web              # this machine only
-uv run python main.py web --lan        # reachable from your phone
-uv run python main.py web --lan --allow-paste
-```
+The dot has to stay on screen — it is what does the listening, and Windows
+stops a hidden window from hearing anything. Keeping it small and faint is the
+next best thing.
 
-Open the printed address. One button: tap, talk, pause. The words appear.
+---
 
-**Chrome, Edge and Safari transcribe in the browser itself** — their speech
-engine returns a transcript the instant you stop talking, with nothing to
-download and no model running on your PC. That is the fast path, and it is the
-default wherever the browser provides it. Firefox has no such engine, so the
-page records, detects the pause itself, and sends one WAV to the Whisper model
-already running on your PC. Either way the audio stays on your network.
+## Everyday use
 
-The transcript then goes through the same cleanup the desktop app uses: fillers
-and stutters gone, spoken punctuation applied, sentences capitalized, snippets
-expanded.
+**Dictate anywhere.** WinWhispr types into whatever window has focus, so it
+works in apps that have no dictation of their own.
 
-Two switches on the page:
+**Speak your punctuation.** Say "comma", "full stop", "question mark" or "new
+line" and you get the real thing.
 
-- **Keep listening** — after each pause it re-arms, so a pause to think does not
-  end the session. On by default.
-- **Type on PC** — every finished sentence is typed into whatever window has
-  focus on the PC. Dictate from the sofa, watch it land in the document.
-  Requires `--allow-paste`.
+**Cancel a sentence.** Press `Esc` while you are still holding the talk key and
+nothing is typed.
 
-`--lan` prints an access token, and the page asks for it once. That route types
-into your machine, so a private network is not treated as a trusted one.
+**Talk without holding the key.** Turn on *Tap twice to keep listening* in
+**Dictation**. Tap the talk key twice and it keeps going until you tap again.
 
-## How to use
+**Fix a name it keeps getting wrong.** Open **Dictionary**, type the correct
+spelling and the way it comes out wrong. From then on it is corrected
+automatically. Only the exact words you list are ever changed.
 
-1. Install WinWhispr (see [Installation](#installation)) and let the first-run
-   setup download + optimize the models — see [Supported models](#supported-models)
-   below to choose which ones.
-2. WinWhispr starts minimized to the **system tray**. Put focus in any app (Gmail,
-   Chrome, Word, a text box).
-3. **Hold `Right Ctrl`**, say your sentence, and let go. The pill shows a
-   waveform while you speak and "Cleaning up…" while WinWhispr tidies the
-   transcript; the finished text is pasted at your cursor. Press `Esc` while
-   recording to discard it.
+**See what you have said.** **Activity** keeps every transcript, searchable,
+with the app it went into — plus your words per minute and how much time you
+have saved. It never leaves your machine.
 
-   That is the whole thing. Two optional extras live in **Dictation keys** if
-   you want them: *tap twice to keep recording* (hands-free, no holding), and a
-   *press-on / press-off combo* like the old `Ctrl+Shift+Space`. Both are off by
-   default so there is only ever one way to start.
+---
 
-   > Using a keyboard layout with **AltGr**? Windows sends a fake Ctrl with it.
-   > Change the talk key to `f13` or `right alt` in **Dictation keys**.
-4. Select text anywhere and press `Ctrl+Alt+R` to **reformat** it with the local
-   LLM. Open the WinWhispr window to see analytics, the searchable activity log,
-   and the settings sidebar (cleanup level, dictionary, dictation keys,
-   microphone, models, VAD sensitivity).
+## The window
 
-If you want text to appear live as you speak instead of once at the end, turn on
-**“Type as I speak”** in the Cleanup section — cleanup needs the whole sentence,
-so it is skipped in that mode.
+Double-click the dot, or click the tray icon, to open WinWhispr. Five tabs:
 
-Settings persist to `config.json`; analytics persist in `app_metrics.db`; the
-dictionary and snippets live in `dictionary.json` and `snippets.json` — all
-under `%USERPROFILE%\.cache\winwhispr`.
+| Tab | What is in it |
+| --- | --- |
+| **Dictation** | Your language, your talk key, and where the dot sits |
+| **Cleanup** | Whether transcripts are tidied before they are typed |
+| **Dictionary** | Names and words it keeps mishearing |
+| **Activity** | Your transcripts, and how much you have dictated |
+| **Storage** | Start with Windows, and erasing your history |
 
-> The `keyboard` library may need Administrator rights for global hooks in some
-> apps. Run WinWhispr as Administrator if the hotkey is blocked in an elevated app.
+Closing the window does not close WinWhispr. It keeps running so your talk key
+is always ready. To close it properly, right-click the dot and choose **Quit**,
+or use the tray icon.
 
+---
 
-## Cloud (Groq)
+## What it does to your words
 
-Speech-to-text runs locally by default. Groq is there for machines too slow for
-a local model, and needs a free [Groq API key](https://console.groq.com/keys).
+Speech comes out messier than writing, so WinWhispr tidies each sentence before
+typing it. Fixed rules, not a model, so the result is the same every time and
+nothing is ever invented:
 
-Paste it into the **Cloud (Groq)** section of the sidebar. It goes into
-**Windows Credential Manager**, never into `config.json`. For development, the
-`GROQ_API_KEY` environment variable works too.
+- fillers removed — "um", "uh", "you know", repeated words
+- spoken punctuation applied
+- sentences capitalised, spacing fixed
+- your dictionary corrections applied
+- your snippets expanded
 
-WinWhispr sends **one request per dictation** — the whole utterance is uploaded
-once when you release the key, rather than one request per pause. The free tier
-allows 20 requests a minute and 2000 a day; turning cleanup on Groq as well
-makes it two requests per dictation.
+Turn all of it off in **Cleanup** if you would rather have exactly what you
+said.
 
-Prefer to stay offline? Pick `Cohere-transcribe` or `Whisper Large` in the ASR
-Model section and leave cleanup on "This machine" — nothing leaves the
-computer, at the cost of a one-time download.
+---
 
-## Supported models
+## Things worth knowing
 
-Local models are pre-optimized **OpenVINO IR** and download on first run (or via
-`WinWhispr.exe setup`) into `%USERPROFILE%\.cache\winwhispr`.
+**It needs an internet connection.** WinWhispr uses the speech recognition
+already built into Windows, which does the transcribing on Microsoft's
+servers. Your audio goes there and nowhere else. Your transcripts, settings and
+dictionary stay on your machine.
 
-### Speech-to-text (ASR)
+**It only listens while you hold the key.** Nothing is recorded in the
+background, and the dot turns green whenever the microphone is open, so you can
+always see it.
 
-| Display name                 | Runs on | Notes |
-| ---------------------------- | ------- | ----- |
-| `Automatic (recommended)`    | This machine | **Default.** Picks a model to fit the hardware, then verifies it by measurement |
-| `Whisper Base (local, fast)` | This machine | ~380ms per utterance on a modern CPU |
-| `Whisper Small (local, accurate)` | This machine | ~1.2s, better on names |
-| `Whisper Tiny (local, fastest)`   | This machine | ~190ms, weakest on proper nouns |
-| `Groq Whisper Turbo`         | Groq | Needs an API key; the transcript leaves the machine |
-| `Cohere-transcribe`          | This machine | OpenVINO FP16, 4.4 GB |
-| `Whisper Large`              | This machine | OpenVINO INT4 |
+**It needs the WebView2 runtime.** Windows 11 has it. On Windows 10 it arrives
+with Microsoft Edge, so almost every machine already has it.
 
-### Clipboard reformatter (LLM)
+**Some apps need Administrator.** Windows will not let a normal program see key
+presses inside an elevated app. If your talk key does nothing in one particular
+program, run WinWhispr as Administrator.
 
-| Display name             | Registry ID                                 | Precision |
-| ------------------------ | ------------------------------------------- | --------- |
-| `LFM2.5 350M`            | `OpenVINO/LFM2.5-350M-int8-ov`              | INT8      |
-| `Qwen2.5-1.5B Instruct`  | `OpenVINO/Qwen2.5-1.5B-Instruct-int4-ov`    | INT4      |
-| `TinyLlama 1.1B Chat`    | `OpenVINO/TinyLlama-1.1B-Chat-v1.0-int4-ov` | INT4      |
-| `Phi-3 Mini Instruct`    | `OpenVINO/Phi-3-mini-4k-instruct-int4-ov`   | INT4      |
+Your settings live in `%USERPROFILE%\.cache\winwhispr`.
 
-### Voice activity detection
-
-- **Silero VAD** (ONNX) — auto-downloaded to `.cache/winwhispr/vad/silero_vad.onnx`.
+---
 
 ## Installation
 
-### Option 1 — Download the installer
+No release is published yet — build from source for now.
 
-No release is published yet — build from source for now. Once one exists, the
-installer is **per-user (no admin)**: it adds a Start Menu entry, optionally a
-login **Startup** shortcut (background tray), and — when the *first-run setup*
-task is selected — downloads and optimizes the models.
+**You need**
 
-### Option 2 — Build from source
+- [Python 3.10+](https://www.python.org/downloads/)
+- [`uv`](https://docs.astral.sh/uv/)
+- [Inno Setup 6](https://jrsoftware.org/isinfo.php), only to build the installer
 
-**Prerequisites**
-
-- **Python 3.10+**
-- [`uv`](https://docs.astral.sh/uv/) (package / venv manager)
-- [Inno Setup 6](https://jrsoftware.org/isinfo.php) — only needed to build the
-  installer (2b)
-
-**Clean setup**
+**Set up and run**
 
 ```powershell
 git clone https://github.com/Vatsa10/WindowWhispr.git
 cd WindowWhispr
-uv venv
 uv sync
+uv run winwhispr
 ```
 
-**Run directly from source** (no packaging):
+**Other ways to start it**
 
 ```powershell
-uv run winwhispr                   # native desktop app (default)
-uv run python main.py headless  # engine only, no window
-uv run python main.py setup     # download + optimize models, then exit
+uv run python main.py listen     # dictation only, no settings window
+uv run python main.py web        # dictate from a phone or another laptop
 ```
 
-**2a. Build the standalone app bundle**
+**Build a copy you can move to another machine**
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File packaging\build.ps1
 ```
 
-Produces `dist\WinWhispr\WinWhispr.exe` — a portable one-directory bundle you can zip
-and copy to another machine.
+Produces `dist\WinWhispr\WinWhispr.exe`, a portable folder you can zip and
+copy. Add `-Installer` to build `WinWhispr-Setup-<version>.exe` instead; the
+script finds `ISCC.exe` on its own.
 
-**2b. Build the installer**
+---
+
+## Dictate from your phone
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File packaging\build.ps1 -Installer
+uv run python main.py web --lan --allow-paste
 ```
 
-Produces `packaging\installer\Output\WinWhispr-Setup-<version>.exe`. The script
-auto-detects `ISCC.exe` from a machine-wide or per-user Inno Setup install.
+Open the printed address on your phone and tap the button. Your phone becomes
+the microphone and your PC gets the words. `--lan` prints an access token the
+page asks for once, because that address can type into your machine and a
+shared network is not a trusted one.
 
-> Models are **not** bundled. They download and are optimized (device-specific
-> OpenVINO compile) on the target machine into `%USERPROFILE%\.cache\winwhispr`.
+---
 
-## Supported hardware (Windows on Intel AI PC)
+## If something is not working
 
-WinWhispr runs entirely on **OpenVINO**, so it targets Intel AI PCs end to end:
+**The talk key does nothing.** Check the dot is there and grey rather than red.
+If the app you are typing into runs as Administrator, WinWhispr has to as well.
 
-- **OS:** Windows 10 / 11, x86-64.
-- **CPU:** any modern Intel Core (used by default for the reformatter LLM, and as
-  the automatic fallback for ASR).
-- **GPU:** Intel Arc / Iris Xe integrated or discrete GPU (default device for
-  ASR; falls back to CPU when no GPU is present).
-- **NPU:** Intel Core Ultra (Meteor Lake / Lunar Lake / Arrow Lake) AI PCs —
-  selectable as an OpenVINO device where supported.
+**"Microphone blocked".** Windows or Edge has denied the microphone. Allow it
+in **Settings → Privacy → Microphone**, then click the dot to try again.
 
-Device selection is configurable per model (`asr_device`, `llm_device`) with
-`AUTO` and CPU fallback, so WinWhispr works across the full Intel AI PC lineup.
+**Nothing was heard.** The dot turns green when the microphone is open — if it
+does not, the wrong input device is selected in Windows sound settings.
 
-## Logs
+**It stopped mid-sentence.** Long pauses end a take. Keep talking, or turn on
+*Tap twice to keep listening*.
 
-WinWhispr writes a rotating debug log to
-`%USERPROFILE%\.cache\winwhispr\logs\winwhispr.log` (kept for both source and
-installed runs). It captures startup, model load/compile, and any errors —
-check it first if the engine fails to start or the UI behaves unexpectedly.
+The log is at `%USERPROFILE%\.cache\winwhispr\logs\winwhispr.log` and is the
+first place to look for anything else.
 
-## Development
+---
+
+## For developers
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design, including why
+the recognizer lives in its own window and why that window cannot be hidden.
 
 ```powershell
 uv run --extra dev pytest
 ```
 
-Everything under `tests/` is pure logic — no Qt, no keyboard hooks, no
-microphone, no models — so the suite runs anywhere in under a second. The
-cleanup gates, layout normalization, dictionary matching, auto-learn filters,
-dictation state machine, and stats maths all have tests that define the
-behavior rather than merely cover it. See
-[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the internal design.
+The suite is pure logic — no Qt, no keyboard hooks, no microphone, no models —
+so it runs anywhere in a second or two. The cleanup rules, dictionary
+corrections, key-binding rules, pill geometry, dictation state machine and
+stats maths all have tests that define the behaviour rather than merely cover
+it. The JavaScript halves of caret insertion and key binding are tested as
+JavaScript, through Node, rather than as Python translations of themselves.
 
 ## Credits
 
-The transcript cleanup design — the prompt, the few-shot set, the deterministic
-gates, the push-to-talk state machine, the dictionary prefilter, and the
-overlay pill — is a Python translation of logic from **WhimprFlow**, an
-MIT-licensed Rust/Tauri dictation proof of concept. See
+The transcript cleanup design — the rules, the deterministic gates, the
+push-to-talk state machine, the dictionary, and the overlay pill — began as a
+Python translation of logic from **WhimprFlow**, an MIT-licensed Rust/Tauri
+dictation proof of concept. See
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for the file-by-file mapping
 and the original license.
 
