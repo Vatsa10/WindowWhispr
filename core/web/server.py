@@ -167,6 +167,20 @@ class WebServer:
         self._paste(text)
         return {"pasted": True}
 
+    def _is_noise(self, text: str) -> bool:
+        """Whether to throw a phrase away as recognizer boilerplate.
+
+        The browser reports no confidence, so this only fires when the phrase
+        is the whole of what was heard -- see core/asr/hallucination.py for why
+        anything wider would eat sentences people actually said.
+        """
+        from core.asr.hallucination import is_whole_transcript_hallucination
+
+        if not is_whole_transcript_hallucination(text):
+            return False
+        print(f"[noise] dropped {text!r}", flush=True)
+        return True
+
     def stream(self, payload: dict) -> dict:
         """Type one finished phrase while the key is still held.
 
@@ -176,7 +190,7 @@ class WebServer:
         no taking it back out of somebody else's application.
         """
         text = (payload.get("text") or "").strip()
-        if not text:
+        if not text or self._is_noise(text):
             return {"typed": False}
         text = self.tidy({"text": text})["text"]
         typed = False
@@ -195,7 +209,7 @@ class WebServer:
         punctuation applied, snippets expanded.
         """
         text = (payload.get("text") or "").strip()
-        if not text:
+        if not text or self._is_noise(text):
             return {"text": "", "pasted": False}
         text = self.tidy({"text": text})["text"]
         pasted = False

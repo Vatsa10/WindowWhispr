@@ -8,7 +8,7 @@ speech segment.
 
 from __future__ import annotations
 
-from core.asr.engine import EngineCaps
+from core.asr.engine import EngineCaps, Segment
 from core.groq_client import DEFAULT_ASR_MODEL
 
 
@@ -42,3 +42,14 @@ class GroqEngine:
             model=self._model,
             sample_rate=self._sample_rate,
         )
+
+    def transcribe_rich(self, audio):
+        """One segment carrying the text and neutral scores.
+
+        This engine reports no confidence, and the defaults pass every
+        hallucination threshold -- so it behaves exactly as it did before the
+        seam existed, rather than being silently filtered by numbers it never
+        produced.
+        """
+        text = self.transcribe(audio)
+        return [Segment(text=text)] if text else []

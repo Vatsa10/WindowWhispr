@@ -11,7 +11,8 @@ import logging
 import threading
 
 from core.asr import cuda_runtime
-from core.asr.engine import EngineCaps
+from core.asr.engine import EngineCaps, Segment, join_segments
+from core.asr.hallucination import drop_hallucinations
 from core.asr.tiering import ModelChoice, calibrate, cpu_fallback
 
 _log = logging.getLogger("winwhispr.asr")
@@ -28,18 +29,43 @@ ASR_PROMPT = (
 TARGET_PEAK = 0.95
 
 
+#: The most a quiet buffer may be amplified. Without a ceiling, room tone with
+#: a peak of 0.02 was scaled about 47x, and Whisper reliably invents speech in
+#: amplified noise -- the single largest source of transcripts nobody said.
+#: Genuinely quiet speech still gets up to 8x, which covers a weak microphone.
+MAX_GAIN = 8.0
+
+#: Retried temperatures, used only when a threshold below rejects a segment.
+#: Clean speech never reaches past the first entry.
+TEMPERATURE_LADDER = (0.0, 0.2, 0.4, 0.6, 0.8, 1.0)
+
+#: Beam search is affordable on a GPU against the warmup budget in
+#: core/asr/tiering.py. CPU stays greedy, reusing the device decision already
+#: made rather than adding a knob nobody can tune.
+BEAM_ON_GPU = 5
+
+#: Decoder self-rejection. A segment failing any of these is retried up the
+#: temperature ladder and dropped if it keeps failing.
+NO_SPEECH_THRESHOLD = 0.6
+LOG_PROB_THRESHOLD = -1.0
+COMPRESSION_RATIO_THRESHOLD = 2.4
+
+
 def _normalize_peak(audio):
     """Scale audio so its loudest sample sits near full scale.
 
-    Silence is returned untouched: dividing by a peak of zero is meaningless,
-    and amplifying room noise to full scale invents speech that was not there.
+    Silence is returned untouched: dividing by a peak of zero is meaningless.
+    Everything else is amplified, but never past ``MAX_GAIN``, so a noise floor
+    stays a noise floor instead of being promoted into something that sounds
+    like speech.
     """
     import numpy as np
 
     peak = float(np.abs(audio).max()) if len(audio) else 0.0
     if peak < 1e-4:
         return audio
-    return (audio * (TARGET_PEAK / peak)).astype(np.float32, copy=False)
+    gain = min(TARGET_PEAK / peak, MAX_GAIN)
+    return (audio * gain).astype(np.float32, copy=False)
 
 
 class FasterWhisperEngine:
@@ -216,17 +242,45 @@ class FasterWhisperEngine:
         }
 
     def _transcribe(self, audio) -> str:
+        return join_segments(drop_hallucinations(self._transcribe_rich(audio)))
+
+    def _transcribe_rich(self, audio):
         model = self._ensure_model()
         audio = _normalize_peak(audio)
-        # Greedy decoding, and no carry-over between segments: this app sends
-        # short independent utterances, and previous-text conditioning is what
-        # makes Whisper repeat itself when a segment is mostly silence.
+        # No carry-over between segments: this app sends short independent
+        # utterances, and previous-text conditioning is what makes Whisper
+        # repeat itself when a segment is mostly silence.
         segments, _info = model.transcribe(
             audio,
             language="en",
-            beam_size=1,
+            beam_size=BEAM_ON_GPU if self._choice.device == "cuda" else 1,
+            # Inert until one of the thresholds below trips, so clean speech
+            # pays nothing: only a segment that was already going to be wrong
+            # is decoded again at a higher temperature. This is what makes
+            # accented speech recoverable rather than confidently wrong.
+            temperature=TEMPERATURE_LADDER,
+            # Let the decoder throw away its own bad output. The compression
+            # ratio is the repetition guard: a segment that degenerates into
+            # the same phrase over and over compresses far better than speech.
+            no_speech_threshold=NO_SPEECH_THRESHOLD,
+            log_prob_threshold=LOG_PROB_THRESHOLD,
+            compression_ratio_threshold=COMPRESSION_RATIO_THRESHOLD,
             condition_on_previous_text=False,
             vad_filter=False,  # our own VAD already cut this audio
             **self._decode_options(),
         )
-        return " ".join(segment.text.strip() for segment in segments).strip()
+        return [
+            Segment(
+                text=segment.text,
+                avg_logprob=float(getattr(segment, "avg_logprob", 0.0) or 0.0),
+                no_speech_prob=float(getattr(segment, "no_speech_prob", 0.0) or 0.0),
+                language="en",
+            )
+            for segment in segments
+        ]
+
+    def transcribe_rich(self, audio):
+        """Segments with their decoder scores, for the hallucination guards."""
+        if audio is None or len(audio) == 0:
+            return []
+        return self._transcribe_rich(audio)

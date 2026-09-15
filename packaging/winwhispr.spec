@@ -94,6 +94,7 @@ _hiddenimports += [
     "core.asr.probe",
     "core.asr.remote_engine",
     "core.asr.tiering",
+    "core.asr.hallucination",
     "core.web",
     "core.web.server",
     "core.web.bridge",

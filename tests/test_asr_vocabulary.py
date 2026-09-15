@@ -43,10 +43,26 @@ def test_vocabulary_is_cleaned_and_deduplicated():
     assert e._decode_options()["hotwords"] == "ChargeBee, Manvi"
 
 
-def test_quiet_audio_is_brought_up_to_level():
+def test_quiet_audio_is_lifted_but_not_past_the_ceiling():
+    """A 0.02 peak used to be scaled about 47x, straight to full scale.
+
+    That is the amplified-noise case Whisper invents speech in, so the lift is
+    now capped. Quiet speech still gets a real boost; a noise floor stays a
+    noise floor.
+    """
+    from core.asr.faster_whisper_engine import MAX_GAIN
+
     quiet = np.full(1000, 0.02, dtype=np.float32)
-    louder = _normalize_peak(quiet)
-    assert abs(float(np.abs(louder).max()) - TARGET_PEAK) < 1e-5
+    louder = float(np.abs(_normalize_peak(quiet)).max())
+    assert louder > 0.02, "quiet audio must still be amplified"
+    assert louder <= 0.02 * MAX_GAIN + 1e-6
+    assert louder < TARGET_PEAK, "the ceiling must bite before full scale"
+
+
+def test_moderately_quiet_audio_still_reaches_the_target():
+    # Anything the ceiling does not bind on is normalised exactly as before.
+    moderate = np.full(1000, 0.4, dtype=np.float32)
+    assert abs(float(np.abs(_normalize_peak(moderate)).max()) - TARGET_PEAK) < 1e-5
 
 
 def test_silence_is_not_amplified():
