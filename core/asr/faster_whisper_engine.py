@@ -12,6 +12,7 @@ import threading
 
 from core.asr import cuda_runtime
 from core.asr.engine import EngineCaps, Segment, join_segments
+from core.asr.decode_policy import resolve
 from core.asr.hallucination import drop_hallucinations
 from core.asr.tiering import ModelChoice, calibrate, cpu_fallback
 
@@ -72,8 +73,14 @@ class FasterWhisperEngine:
     """Local speech-to-text. Loads on first use, never on the hook thread."""
 
     def __init__(self, choice: ModelChoice, cpu_threads: int = 0,
-                 calibrate_on_warmup: bool = False):
+                 calibrate_on_warmup: bool = False,
+                 primary: str = "en", secondary: str = ""):
         self._choice = choice
+        #: The only two languages this engine will ever decode as. A language
+        #: nobody declared is never selected, however confident the model is
+        #: about it -- that is what stops an accent redirecting the transcript.
+        self._primary = (primary or "en").strip().lower()
+        self._secondary = (secondary or "").strip().lower()
         # Only for automatically chosen models. A deliberate choice by the user
         # is theirs to keep, however slow it turns out to be.
         self._calibrate = calibrate_on_warmup
@@ -247,12 +254,13 @@ class FasterWhisperEngine:
     def _transcribe_rich(self, audio):
         model = self._ensure_model()
         audio = _normalize_peak(audio)
+        language = resolve(model, audio, self._primary, self._secondary)
         # No carry-over between segments: this app sends short independent
         # utterances, and previous-text conditioning is what makes Whisper
         # repeat itself when a segment is mostly silence.
         segments, _info = model.transcribe(
             audio,
-            language="en",
+            language=language,
             beam_size=BEAM_ON_GPU if self._choice.device == "cuda" else 1,
             # Inert until one of the thresholds below trips, so clean speech
             # pays nothing: only a segment that was already going to be wrong
@@ -274,7 +282,7 @@ class FasterWhisperEngine:
                 text=segment.text,
                 avg_logprob=float(getattr(segment, "avg_logprob", 0.0) or 0.0),
                 no_speech_prob=float(getattr(segment, "no_speech_prob", 0.0) or 0.0),
-                language="en",
+                language=language,
             )
             for segment in segments
         ]

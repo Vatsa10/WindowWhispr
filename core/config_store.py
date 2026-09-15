@@ -75,6 +75,12 @@ DEFAULT_CONFIG = {
     # on first run. "local" is the offline one.
     "speech_engine": "browser",
     "speech_language": "auto",
+    # The languages the local model may decode. Secondary empty is a hard pin
+    # on the primary, identical to a single-language decode -- open-ended
+    # detection is what makes an accent redirect the transcript into another
+    # language, so a language is only ever a candidate if it was declared.
+    "asr_language_primary": "en",
+    "asr_language_secondary": "",
     # Which corner the pill sits in. It cannot be hidden -- a frozen renderer
     # hears nothing -- so the next best thing is letting people put it out of
     # their own way.

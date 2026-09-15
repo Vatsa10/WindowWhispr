@@ -29,7 +29,7 @@ WRITABLE = frozenset({
     "vad_threshold", "min_silence_ms", "max_segment_seconds",
     "input_device", "llm_model", "llm_device", "pill_enabled",
     "autolearn_enabled", "startup_mode", "history_retention_days",
-    "pill_corner",
+    "pill_corner", "asr_language_primary", "asr_language_secondary",
 })
 
 #: Changing one of these means the engine has to be rebuilt.
@@ -39,6 +39,7 @@ RESTARTS_ENGINE = frozenset({
     "max_segment_seconds", "input_device", "llm_model", "llm_device",
     "commit_mode", "cleanup_level", "cleanup_provider", "cleanup_timeout_ms",
     "toggle_enabled", "hands_free_double_tap", "keep_mic_open",
+    "asr_language_primary", "asr_language_secondary",
 })
 
 

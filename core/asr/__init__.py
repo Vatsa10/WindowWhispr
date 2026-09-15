@@ -62,7 +62,9 @@ def build_engine(model_display_name: str, device: str = "auto", log=print):
             "float16" if device.lower() == "cuda" and hw.cuda_devices else "int8",
             "chosen in settings",
         )
-        return FasterWhisperEngine(forced, cpu_threads=hw.cpu_threads)
+        primary, secondary = _languages()
+        return FasterWhisperEngine(forced, cpu_threads=hw.cpu_threads,
+                                   primary=primary, secondary=secondary)
 
     if backend == "groq_whisper":
         from core.asr.remote_engine import GroqEngine
@@ -72,6 +74,15 @@ def build_engine(model_display_name: str, device: str = "auto", log=print):
     from core.asr.openvino_engine import OpenVinoEngine
 
     return OpenVinoEngine(model_display_name, device=device)
+
+
+def _languages() -> tuple[str, str]:
+    """The declared language pair, from settings."""
+    from core.config_store import load_config
+
+    config = load_config()
+    return (str(config.get("asr_language_primary", "en") or "en"),
+            str(config.get("asr_language_secondary", "") or ""))
 
 
 def _build_auto(log=print):
@@ -85,8 +96,10 @@ def _build_auto(log=print):
         f"{hw.vram_mb}MB VRAM -> {choice.label}: {choice.reason}")
     # Automatic choices are checked against the machine at warmup and downgraded
     # if the guess was optimistic.
+    primary, secondary = _languages()
     return FasterWhisperEngine(choice, cpu_threads=hw.cpu_threads,
-                               calibrate_on_warmup=True)
+                               calibrate_on_warmup=True,
+                               primary=primary, secondary=secondary)
 
 
 def describe_auto_choice() -> str:

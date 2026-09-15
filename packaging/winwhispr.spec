@@ -95,6 +95,7 @@ _hiddenimports += [
     "core.asr.remote_engine",
     "core.asr.tiering",
     "core.asr.hallucination",
+    "core.asr.decode_policy",
     "core.web",
     "core.web.server",
     "core.web.bridge",
