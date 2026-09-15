@@ -1,0 +1,368 @@
+/* WinWhispr, the page.
+ *
+ * Paper ground, olive as the one accent, near-black type. Light rather than
+ * dark on purpose: the product is a dark window, and a page that is also dark
+ * gives the screenshot nothing to sit against. On paper it reads as a real
+ * application photographed, which is what it is.
+ *
+ * Not pure white and not pure black. Both flatten everything near them, and
+ * the grain overlay below needs somewhere to land.
+ */
+
+@font-face {
+  font-family: "Geist";
+  src: url("assets/geist.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Geist Mono";
+  src: url("assets/geist-mono.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+:root {
+  color-scheme: light;
+
+  --bg: #faf9f5;
+  --surface: #ffffff;
+  --surface-2: #f2f0e9;
+  --surface-3: #e9e6dc;
+  --border: #e0ddd1;
+  --border-lit: #c9c5b4;
+
+  /* Type. Near-black, because pure black on paper vibrates. */
+  --fg: #14140f;
+  --fg-2: #56564a;
+  --fg-3: #85857a;
+
+  /* Olive is the accent everywhere the app uses green. Deep enough to carry
+     white text at AA, which a brighter olive would not. */
+  --live: #5f6b3a;
+  --live-lit: #4c5730;
+  --live-soft: #5f6b3a14;
+
+  --font: "Geist", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "Geist Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px;
+  --s5: 24px; --s6: 32px; --s7: 48px; --s8: 72px; --s9: 112px;
+
+  --r-sm: 8px;
+  --r: 12px;
+  --r-lg: 18px;
+  --r-full: 999px;
+
+  --ease: cubic-bezier(.2, .8, .3, 1);
+  --fast: 160ms;
+  --med: 240ms;
+
+  --page: 1120px;
+}
+
+* { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font);
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    transition-duration: .01ms !important;
+  }
+}
+
+/* height:auto is load-bearing: the width and height attributes are there to
+   reserve space and stop the layout jumping, and without this the image keeps
+   its full natural height while the width shrinks, which distorts it and
+   stretches whatever contains it. */
+img { max-width: 100%; height: auto; display: block; }
+
+a { color: var(--live); text-decoration: none; }
+a:hover { color: var(--live-lit); }
+
+:focus-visible { outline: 2px solid var(--live); outline-offset: 3px; border-radius: var(--r-sm); }
+
+h1, h2, h3 { margin: 0; font-weight: 600; letter-spacing: -.02em; line-height: 1.15; }
+p { margin: 0; }
+
+.wrap { width: min(var(--page), 100% - 40px); margin-inline: auto; }
+
+/* Grain, on a fixed pointer-events-none layer and nowhere else. On a
+   scrolling element this repaints every frame and costs real performance;
+   fixed, it is composited once. Paper without any tooth looks like a blank
+   canvas rather than a surface. */
+body::after {
+  content: "";
+  position: fixed; inset: 0; z-index: 1;
+  pointer-events: none;
+  opacity: .5;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='.055'/%3E%3C/svg%3E");
+}
+@media (prefers-reduced-transparency: reduce) { body::after { display: none; } }
+
+.mono { font-family: var(--mono); }
+
+/* --- nav ----------------------------------------------------------------- */
+
+.nav {
+  position: sticky; top: 0; z-index: 10;
+  height: 64px;
+  display: flex; align-items: center;
+  background: #faf9f5e8;
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+}
+.nav .wrap { display: flex; align-items: center; gap: var(--s5); }
+.nav-brand {
+  display: flex; align-items: center; gap: var(--s3);
+  font-weight: 600; letter-spacing: -.015em; color: var(--fg);
+  margin-right: auto;
+}
+.nav-mark {
+  width: 28px; height: 28px; flex: none;
+  display: grid; place-items: center;
+  border-radius: var(--r-sm);
+  background: var(--surface-2); border: 1px solid var(--border);
+  color: var(--live);
+}
+.nav-links { display: flex; align-items: center; gap: var(--s5); }
+.nav-links a { color: var(--fg-2); font-size: 14px; }
+.nav-links a:hover { color: var(--fg); }
+/* Below this the links would wrap to a second line, and a two-line nav reads
+   as broken. The page's own sections are still reachable by scrolling. */
+@media (max-width: 720px) { .nav-links { display: none; } }
+
+/* --- buttons ------------------------------------------------------------- */
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--s2);
+  min-height: 46px; padding: 0 var(--s5);
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--surface-2); color: var(--fg);
+  font: inherit; font-size: 15px; font-weight: 500;
+  cursor: pointer; white-space: nowrap;
+  transition: background var(--fast) var(--ease), border-color var(--fast) var(--ease),
+              transform var(--fast) var(--ease);
+}
+.btn:hover { background: var(--surface-3); border-color: var(--border-lit); color: var(--fg); }
+/* Scale rather than translate, so a press never nudges what sits beside it. */
+.btn:active { transform: scale(.98); }
+.btn.primary {
+  background: var(--live); border-color: var(--live); color: #f7f7f2; font-weight: 600;
+}
+.btn.primary:hover { background: var(--live-lit); border-color: var(--live-lit); color: #ffffff; }
+.btn.sm { min-height: 38px; padding: 0 var(--s4); font-size: 14px; }
+
+/* --- section rhythm ------------------------------------------------------ */
+
+section { padding-block: var(--s9); }
+section + section { border-top: 1px solid var(--border); }
+
+.eyebrow {
+  font-family: var(--mono); font-size: 12px; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--live);
+  margin-bottom: var(--s3);
+}
+.lede { color: var(--fg-2); font-size: 17px; max-width: 58ch; margin-top: var(--s4); }
+
+/* --- hero ---------------------------------------------------------------- */
+
+/* Asymmetric on purpose: the copy is the message and the screenshot is the
+   proof, and giving them equal halves makes neither lead. */
+.hero { padding-block: var(--s9) var(--s8); }
+.hero .wrap {
+  display: grid; gap: var(--s8);
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  align-items: center;
+}
+.hero h1 { font-size: clamp(38px, 5vw, 56px); }
+.hero .lede { font-size: 19px; max-width: 46ch; }
+.hero-actions { display: flex; flex-wrap: wrap; gap: var(--s3); margin-top: var(--s6); }
+.hero-note {
+  margin-top: var(--s4);
+  font-family: var(--mono); font-size: 12.5px; color: var(--fg-3);
+}
+
+/* The product is a dark window. On paper it needs a frame and a real shadow,
+   or it reads as a hole in the page rather than a photograph of an app. */
+.shot {
+  border: 1px solid var(--border-lit); border-radius: var(--r-lg);
+  overflow: hidden; background: #0f172a;
+  padding: 6px;
+  box-shadow: 0 1px 2px #14140f14, 0 24px 48px -12px #14140f38;
+}
+.shot img { border-radius: 12px; }
+
+@media (max-width: 900px) {
+  .hero .wrap { grid-template-columns: 1fr; gap: var(--s7); }
+  section { padding-block: var(--s8); }
+}
+
+/* --- steps --------------------------------------------------------------- */
+
+/* A sequence, not three equal cards: the rule is the thread, and the number
+   sits in the margin rather than in a box of its own. */
+.steps { display: grid; gap: 0; margin-top: var(--s7); }
+.step {
+  display: grid; gap: var(--s5);
+  grid-template-columns: 56px minmax(0, 1fr);
+  padding-block: var(--s5);
+  border-top: 1px solid var(--border);
+}
+.step:last-child { border-bottom: 1px solid var(--border); }
+.step-n {
+  font-family: var(--mono); font-size: 13px; color: var(--live);
+  padding-top: 3px;
+}
+.step h3 { font-size: 18px; }
+.step p { color: var(--fg-2); margin-top: var(--s2); max-width: 62ch; }
+
+kbd {
+  display: inline-block;
+  font-family: var(--mono); font-size: .9em;
+  padding: 1px 7px; border-radius: 6px;
+  background: var(--surface-3);
+  border: 1px solid var(--border); border-bottom-width: 2px;
+  color: var(--fg);
+}
+
+/* --- features ------------------------------------------------------------ */
+
+/* Mixed cell sizes, and two of them carry something other than text, because
+   a grid of identical text tiles is the thing every generated page does. */
+.bento {
+  display: grid; gap: var(--s4); margin-top: var(--s7);
+  grid-template-columns: repeat(6, 1fr);
+}
+.tile {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-lg); padding: var(--s5);
+  grid-column: span 2;
+  transition: border-color var(--fast) var(--ease);
+}
+.tile:hover { border-color: var(--border-lit); }
+.tile.wide { grid-column: span 3; }
+.tile.full { grid-column: span 6; }
+.tile h3 { font-size: 16px; }
+.tile p { color: var(--fg-2); font-size: 14.5px; margin-top: var(--s2); }
+.tile-icon { color: var(--live); margin-bottom: var(--s3); }
+
+@media (max-width: 860px) {
+  .bento { grid-template-columns: repeat(2, 1fr); }
+  .tile, .tile.wide { grid-column: span 1; }
+  .tile.full { grid-column: span 2; }
+}
+@media (max-width: 560px) {
+  .bento { grid-template-columns: 1fr; }
+  .tile, .tile.wide, .tile.full { grid-column: span 1; }
+}
+
+/* A worked example rather than a claim. */
+.demo {
+  display: grid; gap: var(--s4); margin-top: var(--s4);
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+}
+.demo-box {
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: var(--r); padding: var(--s4);
+  font-family: var(--mono); font-size: 13.5px; line-height: 1.7;
+}
+.demo-label {
+  display: block; font-size: 11px; letter-spacing: .07em; text-transform: uppercase;
+  color: var(--fg-3); margin-bottom: var(--s2);
+}
+.demo-arrow { color: var(--fg-3); }
+.strike { color: var(--fg-3); text-decoration: line-through; }
+@media (max-width: 700px) {
+  .demo { grid-template-columns: 1fr; }
+  .demo-arrow { display: none; }
+}
+
+/* --- the dot ------------------------------------------------------------- */
+
+.dot-row {
+  display: grid; gap: var(--s7); margin-top: var(--s7);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  align-items: center;
+}
+/* Deliberately dark: this is a picture of the dot as it appears on a desktop,
+   and showing it on paper would be showing something that never happens. */
+.dot-stage {
+  position: relative;
+  border: 1px solid var(--border-lit); border-radius: var(--r-lg);
+  background: linear-gradient(160deg, #0b1222, #16203a);
+  min-height: 210px;
+  display: grid; place-items: center;
+  box-shadow: 0 1px 2px #14140f14, 0 20px 40px -14px #14140f33;
+}
+.dot-live {
+  width: 18px; height: 18px; border-radius: 50%;
+  background: #22c55e;
+  animation: breathe 1.4s var(--ease) infinite;
+}
+@keyframes breathe { 50% { opacity: .3; transform: scale(.7); } }
+.dot-caption {
+  position: absolute; bottom: var(--s4); left: 0; right: 0;
+  text-align: center; font-family: var(--mono); font-size: 11.5px; color: #7c8699;
+}
+.dot-states { display: grid; gap: var(--s3); margin-top: var(--s5); }
+.dot-state { display: grid; grid-template-columns: 20px 1fr; gap: var(--s3); align-items: start; }
+.swatch { width: 12px; height: 12px; border-radius: 50%; margin-top: 5px; }
+/* The dot's own colours, as they appear on the desktop, not the page palette. */
+.swatch.idle { background: #64748b; }
+.swatch.live { background: #22c55e; }
+.swatch.busy { background: #94a3b8; }
+.dot-state span { color: var(--fg-2); font-size: 14.5px; }
+.dot-state b { color: var(--fg); font-weight: 550; }
+@media (max-width: 860px) { .dot-row { grid-template-columns: 1fr; gap: var(--s5); } }
+
+/* --- honesty ------------------------------------------------------------- */
+
+.facts { display: grid; gap: var(--s4); margin-top: var(--s6); }
+.fact {
+  display: grid; grid-template-columns: 22px 1fr; gap: var(--s4);
+  padding-block: var(--s4);
+  border-top: 1px solid var(--border);
+}
+.fact:last-child { border-bottom: 1px solid var(--border); }
+.fact-mark { color: var(--live); padding-top: 2px; }
+.fact-mark.warn { color: var(--fg-2); }
+.fact b { display: block; font-weight: 550; }
+.fact p { color: var(--fg-2); font-size: 14.5px; margin-top: 2px; max-width: 64ch; }
+
+/* --- download ------------------------------------------------------------ */
+
+.download { text-align: center; }
+.download .lede { margin-inline: auto; }
+.download-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: var(--s3); margin-top: var(--s6); }
+.requirements {
+  margin-top: var(--s6); display: flex; flex-wrap: wrap; justify-content: center;
+  gap: var(--s3) var(--s5);
+  font-family: var(--mono); font-size: 12.5px; color: var(--fg-3);
+}
+
+/* --- footer -------------------------------------------------------------- */
+
+footer {
+  border-top: 1px solid var(--border);
+  padding-block: var(--s6);
+  color: var(--fg-3); font-size: 14px;
+}
+footer .wrap { display: flex; flex-wrap: wrap; gap: var(--s4); align-items: center; }
+footer .spacer { margin-left: auto; }
+footer a { color: var(--fg-2); }
+footer a:hover { color: var(--fg); }

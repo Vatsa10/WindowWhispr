@@ -289,6 +289,9 @@ select.control {
 .switch input:checked + .switch-track .switch-thumb { transform: translateX(16px); background: var(--live); }
 .switch input:focus-visible + .switch-track { outline: 2px solid var(--live); outline-offset: 2px; }
 .switch-text { min-width: 0; }
+/* Both are spans inside a span, so without this the help runs on after the
+   title as one sentence. */
+.switch-title, .switch-help { display: block; }
 .switch-title { font-size: var(--t-base); }
 .switch-help { font-size: var(--t-xs); color: var(--fg-3); line-height: 1.45; }
 

@@ -94,7 +94,7 @@ export function Button({ children, icon, variant = "", size = "", ...rest }) {
 // Press a key, get that key. The only rebinding UI that works on a keyboard
 // this app has never seen -- a dropdown of key names cannot know whether the
 // laptop in front of you actually has a Right Ctrl.
-export function KeyCapture({ value, onChange, suggestions, describe }) {
+export function KeyCapture({ value, onChange, suggestions, describe, help }) {
   const [listening, setListening] = useState(false);
   const [rejected, setRejected] = useState("");
   const box = useRef(null);
@@ -131,6 +131,7 @@ export function KeyCapture({ value, onChange, suggestions, describe }) {
         ${listening ? "Cancel" : "Change"}
       <//>
     </div>
+    ${help && !listening && html`<p class="field-help" style=${{ marginTop: "6px" }}>${help}</p>`}
     ${rejected && html`<p class="field-help" role="alert" style=${{ marginTop: "6px" }}>
       ${describe(rejected)} is needed for typing. Try a key you never use.
     </p>`}

@@ -133,13 +133,14 @@ function Dictation({ config, choices, set }) {
             laptops do not have one, so press Change and hit whichever key you
             never reach for.">
       <div class="grid">
-        <${Field} label="Talk key" help="Hold it to dictate.">
+        <${Field} label="Talk key">
           <${KeyCapture} value=${config.ptt_key} describe=${describe}
-            suggestions=${suggestions}
+            suggestions=${suggestions} help="Hold it to dictate."
             onChange=${(v) => set("ptt_key", v)} />
         <//>
-        <${Field} label="Cancel key" help="Throws away what you just said.">
+        <${Field} label="Cancel key">
           <${KeyCapture} value=${config.cancel_key} describe=${describe}
+            help="Throws away what you just said."
             onChange=${(v) => set("cancel_key", v)} />
         <//>
       </div>
