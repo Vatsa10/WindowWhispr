@@ -103,6 +103,11 @@ def dictionary_path() -> Path:
     return data_dir() / "dictionary.json"
 
 
+
+def pending_path() -> Path:
+    """Corrections seen once, waiting to see whether they repeat."""
+    return data_dir() / "pending.json"
+
 def snippets_path() -> Path:
     """Location of the text-expansion snippet table."""
     return data_dir() / "snippets.json"

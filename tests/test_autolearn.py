@@ -29,9 +29,14 @@ def test_ignores_unrelated_replacements():
     assert detect_correction("the foo is ready", "the Xylophone is ready") is None
 
 
-def test_ignores_lowercase_replacements():
-    # Names are capitalized; a lowercase fix is just an edit.
-    assert detect_correction("the widgit is here", "the widget is here") is None
+def test_learns_lowercase_corrections_now():
+    """Capitalisation used to be required, which blocked every lowercase
+    technical term -- kubectl, jsonl, npm could never be learned. The guard
+    against learning ordinary English is the word lists, not a capital letter.
+    """
+    found = detect_correction("the widgit is here", "the widget is here")
+    assert found is not None
+    assert (found.mishear, found.correct) == ("widgit", "widget")
 
 
 def test_ignores_no_change():
@@ -53,3 +58,43 @@ def test_empty_input_is_safe():
 
 def test_word_tokens_trim_punctuation():
     assert word_tokens("Hi, Manvi! (really)") == ["Hi", "Manvi", "really"]
+
+
+# --- the widened shapes (spec 2026-09-12 §6) ------------------------------
+
+
+def test_two_words_becoming_one_is_detected():
+    """"charge bee" -> "ChargeBee" is the case this module is written around."""
+    found = detect_correction("call charge bee today", "call ChargeBee today")
+    assert found is not None
+    assert (found.mishear, found.correct) == ("charge bee", "ChargeBee")
+
+
+def test_one_word_becoming_two_is_detected():
+    found = detect_correction("open kubectl now", "open kube ctl now")
+    assert found is not None
+    assert found.mishear == "kubectl"
+
+
+def test_a_lowercase_technical_term_is_detected():
+    """Requiring a capital blocked every lowercase term outright."""
+    found = detect_correction("run cube ctl apply", "run kubectl apply")
+    assert found is not None
+    assert found.correct == "kubectl"
+
+
+def test_two_separate_edits_are_not_one_correction():
+    assert detect_correction("alpha beta", "gamma delta") is None
+
+
+def test_an_everyday_misspelling_is_not_learned():
+    # Real, but it teaches nothing about a name, and the dictionary is for names.
+    assert detect_correction("i recieve it", "i receive it") is None
+
+
+def test_stoplist_words_are_still_refused():
+    assert detect_correction("meet them their", "meet them there") is None
+
+
+def test_a_case_only_edit_is_still_refused():
+    assert detect_correction("Manvi is here", "manvi is here") is None

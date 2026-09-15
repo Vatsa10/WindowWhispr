@@ -70,7 +70,13 @@ def _observe(inserted: str, dictionary, delay: float) -> None:
     found = detect_correction(inserted, after)
     if found is None:
         return
-    if dictionary.add(found.correct, [found.mishear], source=SOURCE_AUTO):
+    # Through the pending store, not straight into the dictionary: one sighting
+    # is a typo, two is a pattern. See core/dictionary/promotion.py.
+    from core import paths
+    from core.dictionary.promotion import PendingStore, observe
+
+    pending = PendingStore(paths.pending_path()).load()
+    if observe(found, pending, dictionary):
         # Log the lesson, never the text it came from.
         _log.info("auto-learned: %r -> %r", found.mishear, found.correct)
 

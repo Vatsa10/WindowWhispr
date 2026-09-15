@@ -453,9 +453,9 @@ class HotkeyListener:
         if self._dictionary is None:
             return
         try:
-            terms = []
-            for entry in self._dictionary.entries():
-                terms.append(entry.correct)
+            # Ranked by use and capped: hotword bias dilutes past MAX_VOCAB, so
+            # handing the decoder every entry makes it worse at all of them.
+            terms = self._dictionary.top_terms()
             self._pipeline.set_vocabulary(terms)
             if terms:
                 print(f"[WinWhispr][asr] biasing recognition toward "

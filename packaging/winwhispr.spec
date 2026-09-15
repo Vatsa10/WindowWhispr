@@ -126,6 +126,7 @@ _hiddenimports += [
     "core.stats",
     "core.dictionary",
     "core.dictionary.autolearn",
+    "core.dictionary.promotion",
     "core.dictionary.observer_win",
     "core.dictionary.similarity",
     "core.state",

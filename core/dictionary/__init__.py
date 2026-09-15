@@ -34,18 +34,29 @@ SOURCE_MANUAL = "manual"
 SOURCE_AUTO = "auto"
 
 
+def _int(value) -> int:
+    try:
+        return max(0, int(value or 0))
+    except (TypeError, ValueError):
+        return 0
+
+
 @dataclass
 class DictionaryEntry:
     """An authoritative spelling plus the mishears that map to it."""
 
     correct: str
     mishears: list[str] = field(default_factory=list)
+    #: How often this spelling has actually appeared in something committed.
+    #: Only the most-used entries are given to the decoder, because hotword
+    #: bias measurably dilutes past MAX_VOCAB of them.
+    uses: int = 0
     #: "manual" (typed by the user) or "auto" (learned from a correction).
     source: str = SOURCE_MANUAL
 
     def to_json(self) -> dict:
         return {"correct": self.correct, "mishears": list(self.mishears),
-                "source": self.source}
+                "source": self.source, "uses": self.uses}
 
     @classmethod
     def from_json(cls, raw: dict) -> "DictionaryEntry":
@@ -53,6 +64,7 @@ class DictionaryEntry:
             correct=str(raw.get("correct", "")).strip(),
             mishears=[str(m).strip() for m in raw.get("mishears", []) if str(m).strip()],
             source=str(raw.get("source", SOURCE_MANUAL)),
+            uses=_int(raw.get("uses")),
         )
 
 
@@ -132,6 +144,36 @@ class DictionaryStore:
             )
         self.save()
         return True
+
+    def note_usage(self, text: str) -> bool:
+        """Count the entries whose spelling appears in a committed transcript.
+
+        This is what decides which entries get the limited hotword slots: the
+        names you actually say, rather than the first fifteen you happened to
+        type in.
+        """
+        if not text:
+            return False
+        lowered = f" {text.lower()} "
+        changed = False
+        with self._lock:
+            for entry in self._entries:
+                if f" {entry.correct.lower()} " in lowered:
+                    entry.uses += 1
+                    changed = True
+        if changed:
+            self.save()
+        return changed
+
+    def top_terms(self, limit: int = MAX_VOCAB) -> list[str]:
+        """The spellings worth biasing the decoder toward, most-used first.
+
+        Capped because hotword bias dilutes measurably past this many terms --
+        handing the decoder every entry makes it worse at all of them.
+        """
+        with self._lock:
+            ranked = sorted(self._entries, key=lambda e: (-e.uses, e.correct.lower()))
+        return [entry.correct for entry in ranked[:max(0, limit)]]
 
     def remove(self, correct: str) -> bool:
         """Delete an entry by spelling (case-insensitive)."""

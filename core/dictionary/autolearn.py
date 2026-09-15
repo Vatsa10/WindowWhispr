@@ -36,6 +36,24 @@ STOPLIST = frozenset(
     """.split()
 )
 
+#: Everyday English. Dropping the "must be capitalised" rule let lowercase
+#: technical terms through, which is the point -- but it also let ordinary
+#: words through, and learning "recieve -> receive" as a dictionary entry would
+#: be noise. This is the replacement guard: a correction between two words that
+#: are both plain English teaches nothing about a name.
+COMMON_WORDS = frozenset(
+    """
+    receive received believe achieve because before between business calendar definitely
+    different document during example except exercise experience february finally
+    following friend government happened height however immediately important interest
+    knowledge language library maybe minute necessary neither occasion occurred often
+    people perhaps possible probably question really receipt remember restaurant
+    schedule science second separate similar special started straight strength
+    surprise though thought through together tomorrow tonight truly until usually
+    weather whether writing written yesterday
+    """.split()
+)
+
 _TRIM = string.punctuation
 
 
@@ -53,7 +71,12 @@ def word_tokens(text: str) -> list[str]:
 
 
 def detect_correction(inserted: str, after: str) -> Correction | None:
-    """Find the single-word fix the user made to text WinWhispr just pasted."""
+    """Find the fix the user made to text WinWhispr just pasted.
+
+    One word for one, or one word for two either way -- a name split into two
+    words is the same correction as a name misspelled, and only the second
+    shape used to be visible here.
+    """
     ins = word_tokens(inserted)
     aft = word_tokens(after)
     if not ins or not aft:
@@ -64,20 +87,30 @@ def detect_correction(inserted: str, after: str) -> Correction | None:
     # Set difference, so reordering words is not mistaken for a correction.
     removed = [w for w in ins if w.lower() not in aft_lc]
     added = [w for w in aft if w.lower() not in ins_lc]
-    if len(removed) != 1 or len(added) != 1:
+    # One word becoming two, or two becoming one, as well as a straight swap.
+    # "charge bee" -> "ChargeBee" is the case this module's own docstring is
+    # written around, and strict 1-for-1 could never see it.
+    if not (1 <= len(removed) <= 2 and 1 <= len(added) <= 2):
         return None
+    if len(removed) == 2 and len(added) == 2:
+        return None  # two independent edits, not one correction
 
-    mishear, correct = removed[0], added[0]
+    mishear = " ".join(removed)
+    correct = " ".join(added)
     if len(mishear) < MIN_WORD_LEN or len(correct) < MIN_WORD_LEN:
         return None
-    if not mishear.isalpha() or not correct.isalpha():
+    if not mishear.replace(" ", "").isalpha() or not correct.replace(" ", "").isalpha():
         return None
     if mishear.lower() == correct.lower():
         return None  # a case-only edit teaches nothing about spelling
-    if correct.lower() in STOPLIST or mishear.lower() in STOPLIST:
+    if any(word.lower() in STOPLIST for word in removed + added):
         return None
-    if not correct[0].isupper():
-        return None  # names are capitalized; ordinary words are not worth learning
+    # Capitalisation used to be required, which blocked every lowercase
+    # technical term outright -- "kubectl", "npm", "jsonl" could never be
+    # learned. The stoplist is the real guard against learning ordinary
+    # English; a capital letter never was.
+    if correct.lower() in COMMON_WORDS or mishear.lower() in COMMON_WORDS:
+        return None
 
     distance = normalized_distance(mishear.lower(), correct.lower())
     if 0.0 < distance <= MAX_DISTANCE:

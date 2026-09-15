@@ -104,6 +104,9 @@ class WebServer:
         self.bridge = bridge
         #: The app window's data surface, when there is an app window.
         self.app_api = None
+        #: Called with the text just typed, to watch for the user correcting
+        #: it. Set by whoever wires this server.
+        self.after_paste = None
         #: Called when the pill asks for the main window. Set by its owner.
         self.on_show_app = None
         #: Called with each finished transcript, for the activity log and
@@ -167,6 +170,25 @@ class WebServer:
         self._paste(text)
         return {"pasted": True}
 
+    def _after(self, text: str, typed: bool) -> None:
+        """Everything that happens once words have reached the document.
+
+        Kept in one place so the streamed and released paths cannot drift: a
+        phrase typed while you were still speaking has to count toward usage
+        and be watched for corrections exactly like one typed at the end.
+        """
+        if self.on_transcript is not None:
+            self.on_transcript(text)
+        try:
+            from core import paths
+            from core.dictionary import DictionaryStore
+
+            DictionaryStore(paths.dictionary_path()).load().note_usage(text)
+        except Exception:  # pragma: no cover - store guard
+            _log.debug("could not count dictionary usage", exc_info=True)
+        if typed and self.after_paste is not None:
+            self.after_paste(text)
+
     def _is_noise(self, text: str) -> bool:
         """Whether to throw a phrase away as recognizer boilerplate.
 
@@ -197,8 +219,7 @@ class WebServer:
         if self.allow_paste and self._paste is not None:
             typed = bool(self._paste(text + " "))
         print(f"[stream] {len(text.split())} words, typed={typed}", flush=True)
-        if self.on_transcript is not None:
-            self.on_transcript(text)
+        self._after(text, typed)
         return {"typed": typed, "text": text}
 
     def final(self, payload: dict) -> dict:
@@ -216,8 +237,7 @@ class WebServer:
         if self.allow_paste and self._paste is not None:
             pasted = bool(self._paste(text))
         print(f"[final] {len(text.split())} words, pasted={pasted}", flush=True)
-        if self.on_transcript is not None:
-            self.on_transcript(text)
+        self._after(text, pasted)
         return {"text": text, "pasted": pasted}
 
     def app(self, payload: dict) -> dict:
@@ -438,7 +458,9 @@ def build_services(allow_paste: bool = False):
     engine = build_engine(config.get("asr_model", "auto"),
                           device=config.get("asr_device", "auto"))
     dictionary = DictionaryStore(paths.dictionary_path()).load()
-    engine.set_vocabulary([entry.correct for entry in dictionary.entries()])
+    # Ranked and capped: past MAX_VOCAB terms hotword bias dilutes, so the
+    # slots go to the names actually spoken rather than the first ones typed.
+    engine.set_vocabulary(dictionary.top_terms())
     snippet_table = snippets.load(paths.snippets_path())
 
     def tidy(text: str) -> str:
@@ -498,6 +520,23 @@ def build_hotkey_services(allow_paste: bool = True):
         # a language chosen in settings should not need a restart.
         return normalize(load_config().get("speech_language", "auto"))
 
+    def learn_from(text: str) -> None:
+        """Watch for the user correcting what we just typed.
+
+        Off unless asked for: this reads whatever field has focus, which is
+        every field, including ones nobody should be reading. Nothing is ever
+        logged except the lesson -- a mishear and the spelling that replaced
+        it -- never the text it came from.
+        """
+        if not load_config().get("autolearn_enabled", False):
+            return
+        try:
+            from core.dictionary.observer_win import watch_for_correction
+
+            watch_for_correction(text, DictionaryStore(paths.dictionary_path()).load())
+        except Exception as exc:  # pragma: no cover - platform dependent
+            _log.debug("could not watch for a correction: %s", exc)
+
     def tidy(text: str) -> str:
         """Everything that happens to a transcript before it is typed.
 
@@ -517,8 +556,10 @@ def build_hotkey_services(allow_paste: bool = True):
 
         paste = paste_text
 
-    return WebServer(tidy=tidy, paste=paste, allow_paste=allow_paste,
-                     bridge=Bridge(), language=language)
+    server = WebServer(tidy=tidy, paste=paste, allow_paste=allow_paste,
+                       bridge=Bridge(), language=language)
+    server.after_paste = learn_from
+    return server
 
 
 def _hook_hotkey(bridge, key: str = "right ctrl", on_change=None):

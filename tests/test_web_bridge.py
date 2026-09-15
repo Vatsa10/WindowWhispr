@@ -256,3 +256,33 @@ def test_streamed_phrases_reach_the_activity_log():
     web.on_transcript = logged.append
     web.stream({"text": "one phrase"})
     assert logged == ["ONE PHRASE"]
+
+
+# --- what happens after words reach the document -------------------------
+
+
+def test_a_typed_phrase_is_watched_for_corrections():
+    """Learning only works if something actually feeds the detector."""
+    watched = []
+    web = _server(paste=_recorder([]), allow_paste=True)
+    web.after_paste = watched.append
+    web.stream({"text": "ask manvi"})
+    assert watched == ["ASK MANVI"]
+
+
+def test_nothing_is_watched_when_nothing_was_typed():
+    # With typing disabled there is no pasted text to be corrected.
+    watched = []
+    web = _server()
+    web.after_paste = watched.append
+    web.stream({"text": "ask manvi"})
+    assert watched == []
+
+
+def test_the_released_path_watches_too():
+    """Streamed and released text must not behave differently."""
+    watched = []
+    web = _server(paste=_recorder([]), allow_paste=True)
+    web.after_paste = watched.append
+    web.final({"text": "ask manvi"})
+    assert watched == ["ASK MANVI"]
