@@ -65,4 +65,9 @@ jobs:
           files: |
             WinWhispr-Setup.exe
             WinWhispr-Portable.zip
+          # Without this the action shrugs at files it cannot find and
+          # publishes a release with nothing in it, while the workflow reports
+          # success. An empty release is worse than a failed build: the build
+          # is visibly broken, the empty release just wastes somebody's time.
+          fail_on_unmatched_files: true
           generate_release_notes: true
