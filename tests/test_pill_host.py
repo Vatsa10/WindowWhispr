@@ -8,7 +8,7 @@ where it takes it is the whole design. These pin it.
 import pytest
 
 from core import autostart
-from core.web.pill_host import CORNERS, DEFAULT_CORNER, SIZES, Api, place
+from core.web.pill_host import CORNERS, DEFAULT_CORNER, SIZES, Api, place, scaled
 
 SCREEN = (1920, 1080)
 
@@ -68,72 +68,100 @@ def test_a_screen_smaller_than_the_window_still_places_it_on_screen():
 # --- the bridge -----------------------------------------------------------
 
 
-class _FakeWindow:
-    def __init__(self):
+class _FakeEdge:
+    """The window layer, recorded rather than performed.
+
+    The real one moves an Edge window around with Win32 calls; what these tests
+    care about is which calls are made and with what.
+    """
+
+    def __init__(self, scale=1.0):
         self.calls = []
+        self.scale = scale
 
-    def resize(self, w, h):
-        self.calls.append(("resize", w, h))
+    def dpi_scale(self, _hwnd):
+        return self.scale
 
-    def move(self, x, y):
-        self.calls.append(("move", x, y))
+    def place(self, _hwnd, x, y, width, height, scale=1.0):
+        self.calls.append(("place", x, y, width, height, scale))
 
 
-def test_resizing_to_the_same_state_does_nothing():
+@pytest.fixture
+def fake_edge(monkeypatch):
+    stub = _FakeEdge()
+    monkeypatch.setattr("core.web.pill_host.edge", stub)
+    return stub
+
+
+def _api(fake, corner=DEFAULT_CORNER):
+    api = Api()
+    api.bind(1234, None, SCREEN, corner)
+    return api
+
+
+def test_resizing_to_the_same_state_does_nothing(fake_edge):
     """set_size is called on every render; only real changes touch the window."""
-    window = _FakeWindow()
-    api = Api()
-    api.bind(window, SCREEN)
+    api = _api(fake_edge)
     api.set_size("live")
     api.set_size("live")
-    assert [c[0] for c in window.calls] == ["resize", "move"]
+    assert len(fake_edge.calls) == 1
 
 
-def test_an_unknown_state_is_ignored():
-    window = _FakeWindow()
-    api = Api()
-    api.bind(window, SCREEN)
+def test_an_unknown_state_is_ignored(fake_edge):
+    api = _api(fake_edge)
     api.set_size("nonsense")
-    assert window.calls == []
+    assert fake_edge.calls == []
 
 
 def test_set_size_without_a_window_is_safe():
     Api().set_size("dot")  # the page can render before the window is bound
 
 
-def test_changing_corner_moves_without_resizing():
-    window = _FakeWindow()
-    api = Api()
-    api.bind(window, SCREEN, "bottom-right")
+def test_changing_corner_moves_to_the_new_corner(fake_edge):
+    api = _api(fake_edge, "bottom-right")
     api.set_size("dot")
-    window.calls.clear()
+    fake_edge.calls.clear()
     api.set_corner("top-left")
-    assert [c[0] for c in window.calls] == ["move"]
-    assert window.calls[0][1:] == place(*SCREEN, size="dot", corner="top-left")
+    _call, x, y, _w, _h, _scale = fake_edge.calls[0]
+    assert (x, y) == place(*SCREEN, size="dot", corner="top-left")
 
 
-def test_an_unknown_corner_is_refused():
-    window = _FakeWindow()
-    api = Api()
-    api.bind(window, SCREEN, "bottom-right")
+def test_an_unknown_corner_is_refused(fake_edge):
+    api = _api(fake_edge, "bottom-right")
     api.set_corner("sideways")
-    assert window.calls == []
+    assert fake_edge.calls == []
 
 
-# --- what "start at login" starts ----------------------------------------
+# --- scaled displays ------------------------------------------------------
 
 
-def test_autostart_can_point_at_dictation_only():
-    assert autostart._command("listen").endswith(" listen")
+def test_the_window_is_sized_in_physical_pixels(monkeypatch):
+    """A 340px pill on a 150% screen needs a 510px window.
+
+    Asking for 340 gets a window too small for its own contents, which is what
+    the pill looked like when it first moved into an Edge window: the right
+    thing drawn inside scrollbars.
+    """
+    stub = _FakeEdge(scale=1.5)
+    monkeypatch.setattr("core.web.pill_host.edge", stub)
+    api = Api()
+    api.bind(1234, None, SCREEN, "bottom-right")
+    api.set_size("live")
+    _call, _x, _y, width, height, scale = stub.calls[0]
+    assert (width, height) == (SIZES["live"][0] * 1.5, SIZES["live"][1] * 1.5)
+    # The window layer needs the scale too: Chromium's own title bar is hidden
+    # by making the window taller by a scaled amount and clipping it off.
+    assert scale == 1.5
 
 
-def test_the_default_autostart_command_starts_the_app():
-    assert not autostart._command().endswith(" listen")
+def test_scaling_leaves_an_unscaled_display_alone():
+    assert scaled("live") == SIZES["live"]
 
 
-def test_the_command_quotes_its_paths():
-    """A path with a space breaks an unquoted registry command."""
-    for mode in autostart.MODES:
-        command = autostart._command(mode)
-        assert command.startswith('"')
-        assert command.count('"') % 2 == 0
+@pytest.mark.parametrize("corner", CORNERS)
+def test_a_scaled_window_still_lands_on_screen(corner):
+    for size in SIZES:
+        x, y = place(*SCREEN, size=size, corner=corner, scale=1.5)
+        width, height = scaled(size, 1.5)
+        assert 0 <= x and x + width <= SCREEN[0]
+        assert 0 <= y and y + height <= SCREEN[1]

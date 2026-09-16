@@ -20,11 +20,6 @@ const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 //: How long a finished transcript stays readable before the pill shrinks.
 const SHRINK_DELAY_MS = 2200;
 
-//: How long to wait for a window host before concluding there is not one.
-//: Only reached when the page is opened in an ordinary browser rather than by
-//: the app, where every bridge call is a no-op anyway.
-const NO_HOST_AFTER_MS = 8000;
-
 //: How long to let Chrome finish a take after being asked to stop, before
 //: aborting it outright. Long enough for a normal finalisation, short enough
 //: that a stuck recognizer does not look like a hung app.
@@ -45,37 +40,41 @@ const token = new URLSearchParams(location.search).get("token")
   || "";
 if (token) localStorage.setItem("winwhispr-token", token);
 
-// The native bridge is not there when the page first runs. pywebview injects
-// `window.pywebview.api` and then fires `pywebviewready`, which can be well
-// after React has mounted and asked for its first resize. Guessing at that
-// delay with a timer is how the window ended up stuck at the wrong size with
-// the right thing drawn inside it, so this waits for the event instead.
-//
-// Resolved immediately when the bridge is already there, because the event has
-// then already fired and will not fire again.
-export const bridgeReady = new Promise((resolve) => {
-  if (window.pywebview && window.pywebview.api) return resolve(true);
-  window.addEventListener("pywebviewready", () => resolve(true), { once: true });
-  // A page opened in an ordinary browser has no host and never will. Give up
-  // after a moment so nothing waits on it forever.
-  setTimeout(() => resolve(false), NO_HOST_AFTER_MS);
-});
+// The window host is the process that launched this page: it owns the Edge
+// window the page is drawn in and is the only thing that can move or resize
+// it. It says so by putting its control port in the URL, so a page opened in
+// an ordinary browser simply has no host and every call below is a no-op.
+const CONTROL_PORT = new URLSearchParams(location.search).get("ctl");
 
-// Every call goes through here: a missing bridge, or a build without this
-// method, must never take the UI down.
-function bridge(method, ...args) {
-  const api = window.pywebview && window.pywebview.api;
-  const fn = api && api[method];
-  if (typeof fn !== "function") return false;
+// Kept as a promise because the rest of the file waits on it before asking for
+// its first resize -- the port is known at load time now, but a host that
+// arrives later would only have to resolve this.
+export const bridgeReady = Promise.resolve(Boolean(CONTROL_PORT));
+
+// Every call goes through here. A missing host, or a host without this route,
+// must never take the UI down. The reply is never read: these are all side
+// effects on a window, and keepalive lets them survive the page being busy.
+function bridge(method, value) {
+  if (!CONTROL_PORT) return false;
+  const route = BRIDGE_ROUTES[method];
+  if (!route) return false;
+  const query = value === undefined ? "" : "?v=" + encodeURIComponent(value);
   try {
-    const result = fn.apply(api, args);
-    // pywebview returns a promise; a rejection here is not the page's problem.
-    if (result && typeof result.catch === "function") result.catch(() => {});
+    fetch("http://127.0.0.1:" + CONTROL_PORT + route + query,
+          { mode: "no-cors", keepalive: true }).catch(() => {});
     return true;
   } catch {
     return false;
   }
 }
+
+const BRIDGE_ROUTES = {
+  set_size: "/size",
+  set_corner: "/corner",
+  open_app: "/open-app",
+  drag: "/drag",
+  quit: "/quit",
+};
 
 async function post(path, body) {
   const headers = { "Content-Type": "application/json" };

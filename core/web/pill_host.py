@@ -1,9 +1,11 @@
 """The window that does the listening.
 
-Edge's WebView2 has a real speech service behind ``SpeechRecognition``; Qt's
-WebEngine only has the constructor and terminates the renderer the moment you
-call ``start()``. So the recognizer lives in a WebView2 window rather than in
-the Qt app, and this module is that window.
+It is a real Edge window. Qt's WebEngine has only the ``SpeechRecognition``
+constructor and kills the renderer on ``start()``; WebView2 has the
+constructor and the microphone but not the service behind them, failing with
+``network`` after ``onaudiostart`` on a machine where Edge transcribes the
+same page in the same second. Edge itself is the one host that works, so the
+pill is an Edge window in app mode with its frame taken off.
 
 It cannot be hidden. Chromium freezes the renderer of a window that is hidden
 or off-screen, and a frozen renderer hears nothing -- measured: neither
@@ -12,14 +14,19 @@ window at 35% opacity still reported ``onstart``, ``onaudiostart``,
 ``onspeechstart`` and a transcript. So idle is a dot in a corner you choose,
 and the window only grows when there is something to say.
 
-It runs as a child process because pywebview drives its own Win32 event loop,
-which cannot share a process with Qt's.
+It runs as a child process: it owns a browser process and a small HTTP
+control server, which is the page's only way to ask its own window for
+anything.
 """
 
 from __future__ import annotations
 
 import logging
 import sys
+import threading
+import time
+
+from core.web import edge
 
 _log = logging.getLogger("winwhispr.pill")
 
@@ -47,147 +54,196 @@ APP_MIN_SIZE = (420, 380)
 
 
 def place(screen_width: int, screen_height: int, size: str = "dot",
-          corner: str = DEFAULT_CORNER) -> tuple[int, int]:
+          corner: str = DEFAULT_CORNER, scale: float = 1.0) -> tuple[int, int]:
     """Where a window of this size sits, in the chosen corner.
 
     Anchored by the corner rather than by the top-left, so growing from the dot
     into the pill expands inward instead of pushing the window off the screen.
+
+    Everything here is physical pixels, which is what the screen and the window
+    are measured in; `scale` converts the CSS sizes the page is drawn in.
     """
-    width, height = SIZES.get(size, SIZES["dot"])
+    width, height = scaled(size, scale)
     if corner not in CORNERS:
         corner = DEFAULT_CORNER
     right = corner.endswith("right")
     bottom = corner.startswith("bottom")
 
-    x = screen_width - width - MARGIN_X if right else MARGIN_X
-    y = screen_height - height - MARGIN_BOTTOM if bottom else MARGIN_TOP
+    margin_x = round(MARGIN_X * scale)
+    x = screen_width - width - margin_x if right else margin_x
+    y = (screen_height - height - round(MARGIN_BOTTOM * scale) if bottom
+         else round(MARGIN_TOP * scale))
     return max(0, x), max(0, y)
+
+
+def scaled(size: str, scale: float = 1.0) -> tuple[int, int]:
+    """The window size in physical pixels for a state drawn at `scale`."""
+    width, height = SIZES.get(size, SIZES["dot"])
+    return round(width * scale), round(height * scale)
 
 
 class Api:
     """What the page is allowed to ask of its own window.
 
-    Deliberately small. The page is served over HTTP and this is a native
-    bridge into the host process, so the surface stays short enough to read.
+    Deliberately small. The page is served over HTTP and reaches this over
+    HTTP too, so the surface stays short enough to read in one go.
     """
 
     def __init__(self) -> None:
-        # Underscored on purpose: pywebview exposes the public surface of this
-        # object to JavaScript and walks what it finds, and walking a Window
-        # recurses through its native widget tree until the stack gives out.
-        self._window = None
+        self._hwnd = None
+        self._browser = None
         self._app = None
+        self._app_window = None
         self._screen = (1920, 1080)
         self._size = ""
         self._corner = DEFAULT_CORNER
+        self._scale = 1.0
+        self.stopped = False
 
-    def bind(self, window, screen: tuple[int, int], corner: str = DEFAULT_CORNER) -> None:
-        self._window = window
+    def bind(self, hwnd, browser, screen: tuple[int, int],
+             corner: str = DEFAULT_CORNER) -> None:
+        self._hwnd = hwnd
+        self._browser = browser
         self._screen = screen
         self._corner = corner if corner in CORNERS else DEFAULT_CORNER
+        self._scale = edge.dpi_scale(hwnd)
 
     def set_size(self, size: str) -> None:
         """Grow or shrink to the size for a state."""
-        if self._window is None or size == self._size or size not in SIZES:
-            print(f"[pill] set_size({size!r}) ignored "
-                  f"(current={self._size!r}, bound={self._window is not None})",
-                  flush=True)
+        if self._hwnd is None or size == self._size or size not in SIZES:
             return
         self._size = size
-        width, height = SIZES[size]
-        x, y = place(*self._screen, size=size, corner=self._corner)
-        print(f"[pill] set_size({size!r}) -> {width}x{height} at {x},{y}", flush=True)
-        self._window.resize(width, height)
-        self._window.move(x, y)
+        self._reposition()
 
     def set_corner(self, corner: str) -> None:
         """Move to a different corner, chosen in settings."""
-        if self._window is None or corner not in CORNERS or corner == self._corner:
+        if self._hwnd is None or corner not in CORNERS or corner == self._corner:
             return
         self._corner = corner
-        x, y = place(*self._screen, size=self._size or "dot", corner=corner)
-        self._window.move(x, y)
+        self._reposition()
+
+    def _reposition(self) -> None:
+        size = self._size or "dot"
+        width, height = scaled(size, self._scale)
+        x, y = place(*self._screen, size=size, corner=self._corner,
+                     scale=self._scale)
+        print(f"[pill] {size} -> {width}x{height} at {x},{y} "
+              f"(scale {self._scale})", flush=True)
+        edge.place(self._hwnd, x, y, width, height, self._scale)
+
+    def drag(self) -> None:
+        if self._hwnd is not None:
+            edge.drag(self._hwnd)
 
     def open_app(self, url: str) -> None:
-        """Open the settings window, or raise the one already open.
-
-        Both windows live here because pywebview drives one event loop per
-        process; a second process would be a second loop and a second WebView2
-        runtime for no gain.
-        """
-        import webview
-
-        if self._app is not None:
-            try:
-                self._app.restore()
-                return
-            except Exception:
-                self._app = None  # it was closed; fall through and rebuild
-
-        window = webview.create_window(
-            "WinWhispr",
-            url,
-            width=APP_WIDTH,
-            height=APP_HEIGHT,
-            min_size=APP_MIN_SIZE,
-            background_color="#0F172A",
-        )
-        self._app = window
-
-        def forget():
-            self._app = None
-
-        window.events.closed += forget
+        """Open the settings window, or raise the one already open."""
+        if self._app_window is not None and edge.is_window(self._app_window):
+            edge.raise_window(self._app_window)
+            return
+        before = edge.browser_windows()
+        self._app = edge.launch(url, _profile(), APP_WIDTH, APP_HEIGHT)
+        for _ in range(80):
+            time.sleep(0.25)
+            fresh = edge.browser_windows() - before
+            if fresh:
+                self._app_window = next(iter(fresh))
+                break
 
     def quit(self) -> None:
-        if self._window is not None:
-            self._window.destroy()
+        self.stopped = True
+
+
+def _profile() -> str:
+    """Edge's profile directory: ours, never the user's own."""
+    from core import paths
+
+    directory = paths.data_dir() / "edge"
+    directory.mkdir(parents=True, exist_ok=True)
+    return str(directory)
+
+
+def _control_server(api: "Api"):
+    """The page's only way to talk to its window.
+
+    A separate origin from the page, so every response says so; the calls are
+    all side effects and nothing reads a reply.
+    """
+    import http.server
+    import urllib.parse
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def log_message(self, *_args):
+            pass
+
+        def do_GET(self):
+            parsed = urllib.parse.urlparse(self.path)
+            value = urllib.parse.parse_qs(parsed.query).get("v", [""])[0]
+            route = parsed.path
+            try:
+                if route == "/size":
+                    api.set_size(value)
+                elif route == "/corner":
+                    api.set_corner(value)
+                elif route == "/drag":
+                    api.drag()
+                elif route == "/open-app":
+                    api.open_app(value)
+                elif route == "/quit":
+                    api.quit()
+            except Exception:
+                _log.exception("pill control %s failed", route)
+            self.send_response(204)
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return server
 
 
 def run(url: str, corner: str = DEFAULT_CORNER) -> None:
     """Open the pill on `url` and stay there until it is closed."""
-    import webview
-
-    screen = webview.screens[0] if webview.screens else None
-    width = getattr(screen, "width", 1920)
-    height = getattr(screen, "height", 1080)
-
+    width, height = edge.screen_size()
     api = Api()
-    x, y = place(width, height, "arm", corner)
+    server = _control_server(api)
+    port = server.server_address[1]
+
+    joiner = "&" if "?" in url else "?"
     start_w, start_h = SIZES["arm"]
+    # Which window is ours is decided by what is new, not by which process
+    # owns it: Edge hands the window to a browser process that already has the
+    # profile open and the process we started then exits straight away.
+    before = edge.browser_windows()
+    browser = edge.launch(f"{url}{joiner}ctl={port}", _profile(), start_w, start_h)
 
-    window = webview.create_window(
-        "WinWhispr",
-        url,
-        js_api=api,
-        width=start_w,
-        height=start_h,
-        x=x,
-        y=y,
-        frameless=True,
-        easy_drag=True,      # no title bar, so the pill itself is the handle
-        on_top=True,
-        # pywebview defaults this to (200, 100), which silently clamps every
-        # resize: the dot rendered inside a 200x100 panel because the window
-        # never shrank to fit it.
-        min_size=(1, 1),
-        # Not transparent: WebView2 has no transparent backdrop on Windows and
-        # asking for one leaves white corners behind a rounded pill.
-        background_color="#0F172A",
-    )
-    print(f"[pill] screen {width}x{height}, corner {corner}", flush=True)
-    api.bind(window, (width, height), corner)
-    # private_mode off: the microphone grant has to survive a restart, or the
-    # user re-approves the mic every time the app starts.
-    webview.start(private_mode=False, storage_path=_storage_path())
+    hwnd = None
+    deadline = time.time() + 30
+    while hwnd is None and time.time() < deadline:
+        time.sleep(0.25)
+        fresh = edge.browser_windows() - before
+        hwnd = next(iter(fresh), None)
+    if hwnd is None:
+        _log.error("the pill window never appeared")
+        browser.terminate()
+        return
 
+    print(f"[pill] screen {width}x{height}, corner {corner}, control port {port}",
+          flush=True)
+    api.bind(hwnd, browser, (width, height), corner)
+    edge.strip_frame(hwnd)
+    api.set_size("arm")
 
-def _storage_path() -> str:
-    from core import paths
-
-    directory = paths.data_dir() / "webview"
-    directory.mkdir(parents=True, exist_ok=True)
-    return str(directory)
+    try:
+        # The window, not the process we launched, is the life of the pill:
+        # that process is often a launcher that exits the moment Edge takes
+        # over. When the window goes, so does this.
+        while not api.stopped and edge.is_window(hwnd):
+            time.sleep(0.3)
+    finally:
+        edge.close(hwnd)
+        if api._app_window is not None:
+            edge.close(api._app_window)
+        server.shutdown()
 
 
 if __name__ == "__main__":

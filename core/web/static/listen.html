@@ -13,8 +13,9 @@
    * as visible: a dot in a corner, at a third opacity. It grows into a real
    * pill only while there is something to say, and shrinks back after.
    *
-   * The window is painted the same colour as the pill because WebView2 has no
-   * transparent backdrop on Windows; anything showing through would be white.
+   * The window is painted the same colour as the pill because a Chromium
+   * window has no transparent backdrop on Windows; anything showing through
+   * would be white.
    */
   @font-face {
     font-family: "Geist";
@@ -43,7 +44,10 @@
     --ease: cubic-bezier(.2, .8, .3, 1);
   }
   * { box-sizing: border-box; }
-  html, body, #root { height: 100%; }
+  /* overflow on html as well as body: the window is sized to the pill
+     exactly, so a scrollbar appearing anywhere eats the space the pill
+     needs and the pill wraps inside its own window. */
+  html, body, #root { height: 100%; overflow: hidden; }
   body {
     margin: 0; overflow: hidden;
     background: var(--bg); color: var(--fg);

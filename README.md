@@ -123,8 +123,12 @@ else. Your transcripts, settings and dictionary stay on your machine.
 background, and the dot turns green whenever the microphone is open, so you can
 always see it.
 
-**It needs the WebView2 runtime.** Windows 11 has it. On Windows 10 it arrives
-with Microsoft Edge, so almost every machine already has it.
+**It needs Microsoft Edge.** The recognizer runs in an Edge window of its own,
+because Edge is the only host on Windows with a working speech service behind
+it -- WebView2, which ships the same engine, has the microphone but not the
+service and fails every attempt with a network error. Windows comes with Edge,
+so this is only a problem if you have removed it. WinWhispr uses a profile of
+its own: your own Edge windows, history and session are never touched.
 
 **Some apps need Administrator.** Windows will not let a normal program see key
 presses inside an elevated app. If your talk key does nothing in one particular
@@ -223,10 +227,9 @@ shared network is not a trusted one.
 ## If something is not working
 
 **"Speech service refused", or nothing is transcribed though the dot turns
-green.** Windows blocks the speech service until you have accepted online
-speech recognition. Open **Settings > Privacy & security > Speech** and turn
-on **Online speech recognition**, then try again. The microphone working and
-the transcript never arriving is exactly what this looks like.
+green.** First check Microsoft Edge is installed: the recognizer runs in an
+Edge window and there is no fallback without one. If it is, open **Settings >
+Privacy & security > Speech** and turn on **Online speech recognition**.
 
 **The talk key does nothing.** Check the dot is there and grey rather than red.
 If the app you are typing into runs as Administrator, WinWhispr has to as well.

@@ -598,8 +598,8 @@ def _hook_hotkey(bridge, key: str = "right ctrl", on_change=None):
 def spawn_pill(url: str, corner: str = "bottom-right"):
     """Start the recognizer window as a child process. Returns the process.
 
-    A child rather than a thread: pywebview drives its own Win32 event loop
-    and cannot share a process with Qt's.
+    A child rather than a thread: it owns a browser process and the Win32
+    control of its window, neither of which belongs in Qt's event loop.
     """
     import subprocess
     import sys

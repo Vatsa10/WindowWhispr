@@ -35,9 +35,6 @@ for _pkg in (
     # default location inside a frozen bundle is read-only.
     "comtypes",
     "keyring",
-    # The recognizer window. WebView2 is Edge, and unlike Qt WebEngine it has
-    # a real speech service behind SpeechRecognition.
-    "webview",
 ):
     try:
         d, b, h = collect_all(_pkg)

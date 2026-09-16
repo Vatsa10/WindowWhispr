@@ -5,7 +5,7 @@ one place to pick a language. This is the part of it that dictates using the
 browser's speech engine instead of a local model -- the server, the global
 hotkey, and the recognizer window, started and stopped together.
 
-Why a child process for the window: pywebview drives its own Win32 event loop,
+Why a child process for the window: it owns a browser process of its own,
 which cannot share a process with Qt's. Why a window at all, rather than
 something invisible: Chromium freezes the renderer of a hidden or off-screen
 window, and a frozen renderer hears nothing. See ``core.web.pill_host``.
