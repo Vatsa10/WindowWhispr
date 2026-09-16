@@ -222,6 +222,12 @@ shared network is not a trusted one.
 
 ## If something is not working
 
+**"Speech service refused", or nothing is transcribed though the dot turns
+green.** Windows blocks the speech service until you have accepted online
+speech recognition. Open **Settings > Privacy & security > Speech** and turn
+on **Online speech recognition**, then try again. The microphone working and
+the transcript never arriving is exactly what this looks like.
+
 **The talk key does nothing.** Check the dot is there and grey rather than red.
 If the app you are typing into runs as Administrator, WinWhispr has to as well.
 

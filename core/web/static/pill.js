@@ -30,6 +30,16 @@ const NO_HOST_AFTER_MS = 8000;
 //: that a stuck recognizer does not look like a hung app.
 const STOP_GRACE_MS = 1200;
 
+//: How many times the speech service may fail to answer before the pill stops
+//: calling it a blip and says so. The recognizer restarts itself between
+//: these, so this is a count of attempts, not of seconds.
+const NETWORK_RETRIES = 3;
+
+//: Base wait before retrying a failed service, multiplied by how many times it
+//: has failed in a row, so a service having a bad moment is given longer each
+//: time rather than being hammered.
+const NETWORK_RETRY_MS = 400;
+
 const token = new URLSearchParams(location.search).get("token")
   || localStorage.getItem("winwhispr-token")
   || "";
@@ -91,6 +101,10 @@ function useRecognizer({ onStatus, onSize }) {
   //: again in that window throws and desynchronises everything.
   const starting = useRef(false);
   const stopTimer = useRef(0);
+  //: Consecutive "network" errors. Reset by any successful result, and by
+  //: each new press, so a bad minute never poisons the next take.
+  const networkFailures = useRef(0);
+  const retryTimer = useRef(0);
 
   const [needsArming, setNeedsArming] = useState(true);
 
@@ -188,6 +202,8 @@ function useRecognizer({ onStatus, onSize }) {
     rec.lang = language.current || navigator.language || "en-US";
 
     rec.onresult = (event) => {
+      // Anything came back, so whatever was wrong with the service is over.
+      networkFailures.current = 0;
       let interim = "";
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const chunk = event.results[i][0].transcript;
@@ -215,12 +231,32 @@ function useRecognizer({ onStatus, onSize }) {
 
     rec.onerror = (event) => {
       if (event.error === "no-speech" || event.error === "aborted") return;
+
       if (event.error === "not-allowed" || event.error === "service-not-allowed") {
         armed.current = false;
         setNeedsArming(true);
         return onStatus("error", "Microphone blocked",
           "Allow the microphone for this page, then arm it again.");
       }
+
+      // "network" means the microphone worked and the speech service did not
+      // answer. It is usually brief, and onend restarts the take by itself, so
+      // the first few are reported as reconnecting rather than as a failure --
+      // an error message for something that fixes itself in a second teaches
+      // people to distrust the error messages that matter.
+      if (event.error === "network") {
+        networkFailures.current += 1;
+        if (networkFailures.current < NETWORK_RETRIES && want.current) {
+          return onStatus("busy", "Reconnecting…", "The speech service did not answer.");
+        }
+        // Naming the setting matters: the microphone plainly works, so
+        // "check your connection" sends people to look at the wrong thing.
+        // Windows blocks the speech service outright until online speech
+        // recognition has been accepted, and that is where this usually ends.
+        return onStatus("error", "Speech service refused",
+          "Turn on Settings > Privacy > Speech > Online speech recognition.");
+      }
+
       onStatus("error", "Recognizer error", event.error);
     };
 
@@ -228,13 +264,27 @@ function useRecognizer({ onStatus, onSize }) {
       starting.current = false;
       live.current = false;
       clearTimeout(stopTimer.current);
-      if (want.current) start();
-      else flush();
+      if (!want.current) return flush();
+
+      // Straight back in after a normal end, so a pause mid-sentence does not
+      // cost a word. After a network failure, a beat first: restarting
+      // instantly against a service that just refused would spend every retry
+      // inside the same bad second and report failure before it had waited at
+      // all.
+      if (networkFailures.current > 0) {
+        clearTimeout(retryTimer.current);
+        retryTimer.current = setTimeout(() => {
+          if (want.current) start();
+        }, NETWORK_RETRY_MS * networkFailures.current);
+        return;
+      }
+      start();
     };
 
     recognition.current = rec;
     return () => {
       rec.onend = null;   // do not restart a recognizer that is going away
+      clearTimeout(retryTimer.current);
       try { rec.abort(); } catch { /* already stopped */ }
     };
   }, [onStatus, start, flush, sendPhrase]);
@@ -304,11 +354,13 @@ function useRecognizer({ onStatus, onSize }) {
       if (next) {
         buffer.current = "";
         streamed.current = "";
+        networkFailures.current = 0;
         clearTimeout(shrinkTimer.current);
         clearTimeout(stopTimer.current);
         onSize("live");
         onStatus("live", "Listening", "…");
         start();
+        clearTimeout(retryTimer.current);
       } else if (live.current || starting.current) {
         // Still running, or still coming up: stop() covers both, because its
         // watchdog fires whether or not onstart ever arrived.
