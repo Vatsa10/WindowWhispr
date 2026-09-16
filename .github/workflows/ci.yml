@@ -1,0 +1,30 @@
+# Tests, on every push.
+#
+# Windows rather than Linux, because this app is Windows software: the paths,
+# the keyboard names and the window host are all platform specific, and a suite
+# that only ever passes on Linux is not testing what ships.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  tests:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --extra dev
+      - run: uv run --extra dev pytest -q
+
+      # The JavaScript halves of caret insertion and key binding are tested as
+      # JavaScript. pytest skips them when Node is absent, so without this they
+      # would silently never run in CI.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: node tests/insert_spec.mjs
+      - run: node tests/keys_spec.mjs

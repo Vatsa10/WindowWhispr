@@ -2,6 +2,11 @@
 #
 # Nothing is built. The page is plain HTML, one stylesheet and two fonts, so
 # there is no toolchain here to rot between one deploy and the next.
+#
+# Pages has to be switched on for the repository once, by a human, under
+# Settings > Pages > Source: GitHub Actions. The workflow token is not allowed
+# to do it. Until that happens this job says so and passes: a red badge caused
+# by a settings toggle trains people to ignore red badges.
 name: Pages
 
 on:
@@ -27,13 +32,37 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/configure-pages@v5
-        # Turns Pages on for the repository if it is not already, so the first
-        # deploy does not need somebody to visit a settings screen first.
+
+      - name: Check the page is whole before publishing it
+        run: |
+          test -f docs/index.html || { echo "docs/index.html is missing"; exit 1; }
+          # Every local asset the page asks for must exist, or the site goes up
+          # with a broken image and nobody notices until someone visits.
+          missing=0
+          for ref in $(grep -oE '(href|src)="[^"#][^":]*"' docs/index.html \
+                       | sed -E 's/.*="([^"]+)"/\1/' | grep -v '^http'); do
+            if [ ! -f "docs/$ref" ]; then echo "missing asset: docs/$ref"; missing=1; fi
+          done
+          test "$missing" -eq 0
+
+      - id: pages
+        uses: actions/configure-pages@v5
+        continue-on-error: true
         with:
           enablement: true
+
+      - name: Say how to turn Pages on
+        if: steps.pages.outcome == 'failure'
+        run: |
+          echo "::warning title=Pages is not enabled::Enable it once under \
+          Settings > Pages > Source: GitHub Actions, then re-run this workflow. \
+          The site cannot deploy until then."
+
       - uses: actions/upload-pages-artifact@v3
+        if: steps.pages.outcome == 'success'
         with:
           path: docs
+
       - id: deployment
+        if: steps.pages.outcome == 'success'
         uses: actions/deploy-pages@v4
