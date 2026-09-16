@@ -206,3 +206,46 @@ def dpi_scale(hwnd: int) -> float:
         return user32.GetDpiForWindow(hwnd) / 96.0
     except Exception:      # pragma: no cover - very old Windows
         return 1.0
+
+
+#: Chromium timestamps are microseconds since 1601, not since 1970.
+_EPOCH_OFFSET_US = 11644473600 * 1_000_000
+
+
+def grant_microphone(profile: str, origin: str) -> None:
+    """Record the microphone as already allowed for `origin`.
+
+    The profile belongs to us and holds one page, so there is nobody to ask:
+    the user installed a dictation app, and making them click Allow in a
+    frameless window the size of a pill is a worse answer than granting the
+    one permission that app exists to use.
+
+    Written before Edge starts, because Edge rewrites this file as it runs.
+    Best effort: a profile that cannot be seeded just shows the prompt.
+    """
+    import json
+    import time
+
+    default = os.path.join(profile, "Default")
+    path = os.path.join(default, "Preferences")
+    try:
+        os.makedirs(default, exist_ok=True)
+        try:
+            with open(path, encoding="utf-8") as handle:
+                prefs = json.load(handle)
+        except (OSError, ValueError):
+            prefs = {}
+
+        settings = (prefs.setdefault("profile", {})
+                         .setdefault("content_settings", {})
+                         .setdefault("exceptions", {})
+                         .setdefault("media_stream_mic", {}))
+        stamp = str(int(time.time() * 1_000_000) + _EPOCH_OFFSET_US)
+        settings[f"{origin},*"] = {"last_modified": stamp, "setting": 1}
+
+        temporary = path + ".new"
+        with open(temporary, "w", encoding="utf-8") as handle:
+            json.dump(prefs, handle)
+        os.replace(temporary, path)
+    except OSError:
+        pass

@@ -162,6 +162,14 @@ def _profile() -> str:
     return str(directory)
 
 
+def _origin(url: str) -> str:
+    """The scheme://host:port the page will be served from."""
+    from urllib.parse import urlsplit
+
+    parts = urlsplit(url)
+    return f"{parts.scheme}://{parts.netloc}"
+
+
 def _control_server(api: "Api"):
     """The page's only way to talk to its window.
 
@@ -213,6 +221,8 @@ def run(url: str, corner: str = DEFAULT_CORNER) -> None:
     # Which window is ours is decided by what is new, not by which process
     # owns it: Edge hands the window to a browser process that already has the
     # profile open and the process we started then exits straight away.
+    # Granted rather than asked for: see edge.grant_microphone.
+    edge.grant_microphone(_profile(), _origin(url))
     before = edge.browser_windows()
     browser = edge.launch(f"{url}{joiner}ctl={port}", _profile(), start_w, start_h)
 

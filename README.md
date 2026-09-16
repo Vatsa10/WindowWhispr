@@ -11,16 +11,13 @@ is installed.
 
 ## Getting started
 
-**1. Start WinWhispr.** A small button appears near the corner of your screen
-saying *Tap to enable the microphone*. Tap it once and allow the microphone.
-You only ever do this once.
+**1. Start WinWhispr.** A dot appears near the corner of your screen. That dot
+is WinWhispr waiting: faint, out of your way, and already listening for your
+talk key. There is nothing to set up and no permission to grant.
 
-**2. The button shrinks to a dot.** That dot is WinWhispr waiting. It sits in
-the corner, faint, out of your way.
+**2. Click into anything you can type in.** An email, a search box, a document.
 
-**3. Click into anything you can type in.** An email, a search box, a document.
-
-**4. Hold `Right Ctrl`, say a sentence, and let go.** The dot grows into a pill
+**3. Hold `Right Ctrl`, say a sentence, and let go.** The dot grows into a pill
 while you speak so you can see it is listening, and your words are typed at
 your cursor a moment after you release the key.
 
@@ -160,8 +157,8 @@ every program without a paid code-signing certificate, which this does not yet
 have. Choose **More info**, then **Run anyway**. If you would rather not take
 that on trust, build it yourself from source below; it is the same program.
 
-WinWhispr starts in the system tray with a small button near the corner of your
-screen. Tap it once to allow the microphone and you are done.
+WinWhispr starts in the system tray with a dot near the corner of your screen.
+That is it -- hold your talk key and speak.
 
 ### Removing it
 
@@ -234,8 +231,10 @@ Privacy & security > Speech** and turn on **Online speech recognition**.
 **The talk key does nothing.** Check the dot is there and grey rather than red.
 If the app you are typing into runs as Administrator, WinWhispr has to as well.
 
-**"Microphone blocked".** Windows or Edge has denied the microphone. Allow it
+**"Microphone blocked".** Windows has denied the microphone to Edge. Allow it
 in **Settings → Privacy → Microphone**, then click the dot to try again.
+WinWhispr grants itself the microphone inside its own Edge profile, but it
+cannot grant what Windows has taken away from Edge altogether.
 
 **Nothing was heard.** The dot turns green when the microphone is open — if it
 does not, the wrong input device is selected in Windows sound settings.
