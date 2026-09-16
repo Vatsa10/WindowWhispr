@@ -35,11 +35,12 @@ jobs:
       - run: uv run --extra dev pytest -q
       - run: uv run --extra build pyinstaller --noconfirm --clean packaging/winwhispr.spec
 
+      # Asset names carry no version, so the website can link straight at
+      # releases/latest/download/<name> and never need editing again. The
+      # version is in the release title, the tag, and the app itself.
       - name: Zip the bundle
         shell: pwsh
-        run: |
-          $v = (Get-Content VERSION -Raw).Trim()
-          Compress-Archive -Path dist/WinWhispr/* -DestinationPath "WinWhispr-$v-windows.zip"
+        run: Compress-Archive -Path dist/WinWhispr/* -DestinationPath "WinWhispr-Portable.zip"
 
       # The installer is what puts WinWhispr in the Start Menu and in Add or
       # remove programs, so it is the build most people should be offered.
@@ -53,12 +54,15 @@ jobs:
           if (-not (Test-Path $iscc)) { throw "Inno Setup not found at $iscc" }
           & $iscc "/DAppVersion=$v" packaging\installer\winwhispr.iss
           if ($LASTEXITCODE -ne 0) { throw "ISCC failed with $LASTEXITCODE" }
-          Get-ChildItem packaging\installer\Output
+          $built = Get-ChildItem packaging\installer\Output\*.exe | Select-Object -First 1
+          if (-not $built) { throw "ISCC produced no installer" }
+          Copy-Item $built.FullName "WinWhispr-Setup.exe"
+          Get-ChildItem WinWhispr-*
 
       - uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
-            WinWhispr-*-windows.zip
-            packaging/installer/Output/WinWhispr-Setup-*.exe
+            WinWhispr-Setup.exe
+            WinWhispr-Portable.zip
           generate_release_notes: true

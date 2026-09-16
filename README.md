@@ -139,13 +139,13 @@ Your settings live in `%USERPROFILE%\.cache\winwhispr`.
 ### The quick way
 
 1. Open the [latest release](https://github.com/Vatsa10/WindowWhispr/releases/latest).
-2. Download `WinWhispr-Setup-<version>.exe`.
+2. Download **WinWhispr-Setup.exe**.
 3. Run it. No administrator password: it installs for you only.
 
 WinWhispr appears in the Start Menu, so typing its name finds it, and in
 **Add or remove programs** for when you want it gone.
 
-**Prefer not to install anything?** Download `WinWhispr-<version>-windows.zip`
+**Prefer not to install anything?** Download **WinWhispr-Portable.zip**
 instead, extract it somewhere permanent (your Downloads folder is not
 permanent) and run **WinWhispr.exe**. Nothing is registered with Windows, so
 it will not turn up in search until you switch on **Show WinWhispr in the

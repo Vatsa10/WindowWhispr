@@ -349,6 +349,13 @@ kbd {
 .download { text-align: center; }
 .download .lede { margin-inline: auto; }
 .download-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: var(--s3); margin-top: var(--s6); }
+.download-note {
+  margin: var(--s5) auto 0; max-width: 56ch;
+  color: var(--fg-2); font-size: 14.5px;
+}
+.download-note + .download-note { margin-top: var(--s3); font-size: 13.5px; color: var(--fg-3); }
+.download-note b { color: var(--fg); font-weight: 550; }
+
 .requirements {
   margin-top: var(--s6); display: flex; flex-wrap: wrap; justify-content: center;
   gap: var(--s3) var(--s5);
