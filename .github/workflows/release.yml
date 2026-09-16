@@ -41,8 +41,24 @@ jobs:
           $v = (Get-Content VERSION -Raw).Trim()
           Compress-Archive -Path dist/WinWhispr/* -DestinationPath "WinWhispr-$v-windows.zip"
 
+      # The installer is what puts WinWhispr in the Start Menu and in Add or
+      # remove programs, so it is the build most people should be offered.
+      # Inno Setup ships on the Windows runner, which is the only reason this
+      # does not need installing first.
+      - name: Build the installer
+        shell: pwsh
+        run: |
+          $v = (Get-Content VERSION -Raw).Trim()
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { throw "Inno Setup not found at $iscc" }
+          & $iscc "/DAppVersion=$v" packaging\installer\winwhispr.iss
+          if ($LASTEXITCODE -ne 0) { throw "ISCC failed with $LASTEXITCODE" }
+          Get-ChildItem packaging\installer\Output
+
       - uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: WinWhispr-*-windows.zip
+          files: |
+            WinWhispr-*-windows.zip
+            packaging/installer/Output/WinWhispr-Setup-*.exe
           generate_release_notes: true

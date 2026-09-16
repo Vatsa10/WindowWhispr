@@ -54,6 +54,8 @@ APP_OPS = {
     "dictionary_add": ("dictionary_add", True),
     "dictionary_remove": ("dictionary_remove", True),
     "models": ("models", False),
+    "shortcut": ("shortcut", False),
+    "set_shortcut": ("set_shortcut", True),
     "model_remove": ("model_remove", True),
 }
 STATIC_DIR = Path(__file__).parent / "static"

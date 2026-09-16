@@ -77,6 +77,7 @@ _hiddenimports += [
     "webview",
     "core.web.paste",
     "core.autostart",
+    "core.shortcuts",
     "core.updates",
     "core.commands",
     "core.groq_client",

@@ -139,6 +139,20 @@ class AppApi:
             "corners": list(CORNERS),
         }
 
+    def shortcut(self) -> dict:
+        """Whether WinWhispr appears in the Start Menu, and whether it can."""
+        from core import shortcuts
+
+        return {"present": shortcuts.exists(),
+                "available": shortcuts.target() is not None}
+
+    def set_shortcut(self, payload: dict) -> dict:
+        from core import shortcuts
+
+        wanted = bool(payload.get("enabled"))
+        shortcuts.set_enabled(wanted)
+        return self.shortcut()
+
     # -- what happened ----------------------------------------------------
 
     def stats(self) -> dict:

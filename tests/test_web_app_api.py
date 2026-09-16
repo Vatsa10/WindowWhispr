@@ -71,3 +71,23 @@ def test_a_failing_handler_does_not_take_the_app_down():
     server = WebServer()
     server.app_api = Broken()
     assert server.app({"op": "config"})["error"] == "disk on fire"
+
+
+# --- the Start Menu entry -------------------------------------------------
+
+
+def test_the_shortcut_verbs_are_reachable_from_the_page():
+    from core.web.app_api import AppApi
+    from core.web.server import APP_OPS
+
+    for op in ("shortcut", "set_shortcut"):
+        assert op in APP_OPS
+        assert hasattr(AppApi, APP_OPS[op][0])
+
+
+def test_running_from_source_offers_no_shortcut(monkeypatch):
+    """The setting hides rather than failing when there is nothing to point at."""
+    from core.web.app_api import AppApi
+
+    monkeypatch.setattr("core.paths.is_frozen", lambda: False)
+    assert AppApi().shortcut()["available"] is False

@@ -374,6 +374,22 @@ function Activity({ notify }) {
 
 function Storage({ config, set, notify }) {
   const [confirming, setConfirming] = useState(false);
+  const [shortcut, setShortcut] = useState(null);
+
+  useEffect(() => {
+    ask("shortcut").then(setShortcut).catch(() => setShortcut({ available: false }));
+  }, []);
+
+  const toggleShortcut = async (enabled) => {
+    setShortcut((s) => ({ ...s, present: enabled }));   // the switch answers now
+    try {
+      setShortcut(await ask("set_shortcut", { enabled }));
+      notify(enabled ? "Added to the Start Menu" : "Removed from the Start Menu");
+    } catch (err) {
+      notify(err.message, "bad");
+      setShortcut(await ask("shortcut"));
+    }
+  };
 
   const wipe = async () => {
     setConfirming(false);
@@ -383,6 +399,15 @@ function Storage({ config, set, notify }) {
 
   return html`<div>
     <p class="view-lede">What WinWhispr keeps on this machine, and how it starts.</p>
+
+    ${shortcut && shortcut.available && html`<${Card} title="Start Menu"
+      hint="Adds WinWhispr to the Start Menu so it turns up when you type its
+            name. The installer does this for you; a copy you unzipped yourself
+            has to be told.">
+      <${Switch} id="startmenu" checked=${!!shortcut.present}
+        onChange=${toggleShortcut}
+        title="Show WinWhispr in the Start Menu" />
+    <//>`}
 
     <${Card} icon="drive" title="Start with Windows"
       hint="WinWhispr is small and idle until you hold the talk key, so leaving

@@ -139,10 +139,17 @@ Your settings live in `%USERPROFILE%\.cache\winwhispr`.
 ### The quick way
 
 1. Open the [latest release](https://github.com/Vatsa10/WindowWhispr/releases/latest).
-2. Download `WinWhispr-<version>-windows.zip`.
-3. Right-click the zip, choose **Extract All**, and pick somewhere permanent.
-   Your Downloads folder is not permanent.
-4. Open the extracted folder and run **WinWhispr.exe**.
+2. Download `WinWhispr-Setup-<version>.exe`.
+3. Run it. No administrator password: it installs for you only.
+
+WinWhispr appears in the Start Menu, so typing its name finds it, and in
+**Add or remove programs** for when you want it gone.
+
+**Prefer not to install anything?** Download `WinWhispr-<version>-windows.zip`
+instead, extract it somewhere permanent (your Downloads folder is not
+permanent) and run **WinWhispr.exe**. Nothing is registered with Windows, so
+it will not turn up in search until you switch on **Show WinWhispr in the
+Start Menu** in the app's **Storage** tab.
 
 Windows will warn you that it does not recognise the app. It says this about
 every program without a paid code-signing certificate, which this does not yet
@@ -152,14 +159,21 @@ that on trust, build it yourself from source below; it is the same program.
 WinWhispr starts in the system tray with a small button near the corner of your
 screen. Tap it once to allow the microphone and you are done.
 
-### Keeping it
+### Removing it
 
-Nothing is installed into Windows. The app is the folder you extracted, and
-deleting that folder removes it. To have it start with Windows, open the app
-and turn on **Start with Windows** in **Storage**.
+Uninstall from **Add or remove programs**, or from the Start Menu entry. It
+deletes the program folder completely and removes the sign-in entry if you
+turned that on, then asks whether to delete your settings, dictionary and
+history as well. Answer No and a future reinstall picks up where you left off.
 
-Your settings, dictionary and history live in `%USERPROFILE%\.cache\winwhispr`
-and survive an upgrade. To upgrade, download the new zip and replace the folder.
+If you used the zip, delete the folder you extracted. Your settings live
+separately, in `%USERPROFILE%\.cache\winwhispr`; delete that folder too if you
+want nothing left behind.
+
+### Upgrading
+
+Your settings, dictionary and history survive an upgrade. Run the new installer
+over the top, or replace the extracted folder with the new one.
 
 WinWhispr checks for a newer release once a day and tells you in a notification
 when there is one. It never downloads or installs anything by itself.
