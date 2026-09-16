@@ -1,0 +1,39 @@
+# Publish docs/ as the site.
+#
+# Nothing is built. The page is plain HTML, one stylesheet and two fonts, so
+# there is no toolchain here to rot between one deploy and the next.
+name: Pages
+
+on:
+  push:
+    branches: [main]
+    paths: ["docs/**", ".github/workflows/pages.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+        # Turns Pages on for the repository if it is not already, so the first
+        # deploy does not need somebody to visit a settings screen first.
+        with:
+          enablement: true
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deployment
+        uses: actions/deploy-pages@v4

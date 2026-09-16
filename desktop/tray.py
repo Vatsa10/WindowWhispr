@@ -49,9 +49,36 @@ class TrayApp:
         self._tray.setToolTip("WinWhispr")
         self._tray.setContextMenu(self._menu())
         self._tray.activated.connect(self._on_tray_activated)
+        self._tray.messageClicked.connect(self._on_message_clicked)
+        #: Set when an update notice is showing, so clicking it goes somewhere.
+        self._update_url = ""
         self._tray.show()
 
         self.start_engine()
+        self._check_for_updates()
+
+    def _check_for_updates(self) -> None:
+        """Ask GitHub whether a newer release exists, on a background thread.
+
+        Never blocks startup and never raises: the answer is a notification at
+        most once a day, and a machine with no network simply never sees one.
+        """
+        def look():
+            try:
+                from core import updates
+
+                result = updates.check()
+            except Exception:
+                _log.debug("update check failed", exc_info=True)
+                return
+            if not result.get("update"):
+                return
+            self._update_url = result["url"]
+            self._notify(
+                f"WinWhispr {result['latest']} is available",
+                "You are on " + result["current"] + ". Click to open the release page.")
+
+        threading.Thread(target=look, daemon=True, name="winwhispr-updates").start()
 
     # -- menu -------------------------------------------------------------
 
@@ -94,6 +121,14 @@ class TrayApp:
             self._notify("No window to open",
                          "The dictation window is not running.")
 
+    def _on_message_clicked(self) -> None:
+        if not self._update_url:
+            return
+        import webbrowser
+
+        webbrowser.open(self._update_url)
+        self._update_url = ""
+
     def _notify(self, title: str, detail: str) -> None:
         self._tray.showMessage(title, detail, QSystemTrayIcon.Information, 3000)
 
@@ -127,7 +162,16 @@ class TrayApp:
         _log.info("browser dictation ready at %s", browser.url)
 
     def _build_local(self) -> None:
-        from core.hotkey_listener import HotkeyListener
+        try:
+            # Imported here, and inside the try, because the packaged build
+            # does not ship the local speech stack. An ImportError on a
+            # background thread would otherwise kill the engine silently and
+            # leave a dot that never listens.
+            from core.hotkey_listener import HotkeyListener
+        except ImportError:
+            _log.info("local engine not available in this build; using the browser")
+            self._config["speech_engine"] = "browser"
+            return self._build_browser()
 
         try:
             listener = HotkeyListener(
@@ -205,6 +249,7 @@ class TrayApp:
         if needs_restart(changes):
             _log.info("restarting the engine for %s", sorted(changes))
             self.start_engine()
+        self._check_for_updates()
 
     def _on_window_closed(self) -> None:
         """The user closed the pill. That is how this app is quit."""

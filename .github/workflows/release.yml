@@ -1,0 +1,48 @@
+# Build the portable bundle and attach it to a release.
+#
+# Triggered by pushing a tag, so cutting a release is one command and the
+# artifact is built by a clean machine rather than whichever laptop happened to
+# run it. The tag and the VERSION file must agree, and the job fails loudly if
+# they do not: a release whose contents report a different number than its own
+# name is worse than no release at all.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the tag matches VERSION
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}" -replace '^v', ''
+          $file = (Get-Content VERSION -Raw).Trim()
+          if ($tag -and $tag -ne $file) {
+            throw "tag $tag does not match VERSION $file"
+          }
+
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --extra build --extra dev
+      - run: uv run --extra dev pytest -q
+      - run: uv run --extra build pyinstaller --noconfirm --clean packaging/winwhispr.spec
+
+      - name: Zip the bundle
+        shell: pwsh
+        run: |
+          $v = (Get-Content VERSION -Raw).Trim()
+          Compress-Archive -Path dist/WinWhispr/* -DestinationPath "WinWhispr-$v-windows.zip"
+
+      - uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: WinWhispr-*-windows.zip
+          generate_release_notes: true

@@ -24,17 +24,12 @@ _datas = []
 _binaries = []
 _hiddenimports = []
 
+# Only what the shipping path needs. The local speech model is not bundled:
+# it pulled openvino, llvmlite, ctranslate2, av, scipy, onnxruntime, numba and
+# sklearn behind it, about 580MB of an 815MB download, for an engine the app
+# does not use. Anyone who wants it can run from source, where uv installs the
+# lot in one command.
 for _pkg in (
-    "openvino",
-    "openvino_genai",
-    "openvino_tokenizers",
-    "onnxruntime",
-    "librosa",
-    "soundfile",
-    "sounddevice",
-    "tokenizers",
-    "numba",
-    "llvmlite",
     # UI Automation bindings for auto-learning dictionary entries. comtypes
     # generates its wrappers at runtime into paths.data_dir(), because the
     # default location inside a frozen bundle is read-only.
@@ -43,8 +38,6 @@ for _pkg in (
     # The recognizer window. WebView2 is Edge, and unlike Qt WebEngine it has
     # a real speech service behind SpeechRecognition.
     "webview",
-    "faster_whisper",
-    "ctranslate2",
 ):
     try:
         d, b, h = collect_all(_pkg)
@@ -54,25 +47,10 @@ for _pkg in (
     except Exception:
         pass
 
-# huggingface_hub powers snapshot_download() for first-run model fetching.
-for _pkg in ("huggingface_hub",):
-    try:
-        d, b, h = collect_all(
-            _pkg, include_py_files=False, exclude_datas=["**/*.pt", "**/*.h5"]
-        )
-        _datas += d
-        _binaries += b
-        _hiddenimports += h
-    except Exception:
-        pass
-
 _hiddenimports += [
     "core.paths",
     "core.logging_setup",
-    "core.processor",
-    "core.reformatter",
     "core.hotkey_listener",
-    "core.model_manager",
     "core.model_registry",
     "core.config_store",
     "core.active_window",
@@ -86,16 +64,6 @@ _hiddenimports += [
     "core.cleanup.prompts",
     "core.cleanup.provider_local",
     "core.cleanup.deterministic",
-    "core.asr",
-    "core.asr.engine",
-    "core.asr.faster_whisper_engine",
-    "core.asr.openvino_engine",
-    "core.asr.pipeline",
-    "core.asr.probe",
-    "core.asr.remote_engine",
-    "core.asr.tiering",
-    "core.asr.hallucination",
-    "core.asr.decode_policy",
     "core.web",
     "core.web.server",
     "core.web.bridge",
@@ -108,10 +76,8 @@ _hiddenimports += [
     "desktop.tray",
     "webview",
     "core.web.paste",
-    "core.model_store",
-    "faster_whisper",
-    "ctranslate2",
     "core.autostart",
+    "core.updates",
     "core.commands",
     "core.groq_client",
     "core.secrets",
@@ -152,6 +118,10 @@ a = Analysis(
     binaries=_binaries,
     datas=_datas + [
         (os.path.join(_ROOT, "assets"), "assets"),
+        # The running version, which the update check compares against the
+        # latest release. Without it a packaged build has no idea how old
+        # it is.
+        (os.path.join(_ROOT, "VERSION"), "."),
         # The browser front end is served from disk at runtime, so its
         # static files have to travel with the executable.
         (os.path.join(_ROOT, "core", "web", "static"),
@@ -161,7 +131,17 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[os.path.join(_PACKAGING_DIR, "hooks", "rthook_dll_dirs.py")],
-    excludes=["torch", "tensorflow", "transformers", "tkinter", "matplotlib"],
+    excludes=[
+        # The local speech stack and everything it drags in. Excluded rather
+        # than merely not imported, because a transitive import would pull
+        # hundreds of megabytes back in without anyone noticing.
+        "torch", "tensorflow", "transformers", "tkinter", "matplotlib",
+        "openvino", "openvino_genai", "openvino_tokenizers",
+        "faster_whisper", "ctranslate2", "onnxruntime",
+        "librosa", "soundfile", "sounddevice", "av",
+        "numba", "llvmlite", "scipy", "sklearn", "tokenizers",
+        "huggingface_hub", "hf_xet", "pandas",
+    ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,

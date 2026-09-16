@@ -109,21 +109,30 @@ class AppApi:
 
     def choices(self) -> dict:
         """Everything the dropdowns need, gathered in one round trip."""
-        from core.model_registry import list_model_names
         from core.web.keys import SUGGESTED_TALK_KEYS
         from core.web.languages import LANGUAGES
         from core.web.pill_host import CORNERS
 
+        # Both of these belong to the local speech stack, which the packaged
+        # build does not ship. Their absence must not stop the settings screen
+        # from opening, so neither is allowed to raise past here.
         try:
             from core.processor import available_devices
 
             devices = list(available_devices())
-        except Exception:  # device enumeration fails on some machines
-            _log.warning("could not enumerate devices", exc_info=True)
-            devices = ["CPU"]
+        except Exception:
+            _log.debug("no compute devices to list", exc_info=True)
+            devices = []
+        try:
+            from core.model_registry import list_model_names
+
+            models = list(list_model_names())
+        except Exception:
+            _log.debug("no local models to list", exc_info=True)
+            models = []
         return {
             "languages": [{"tag": tag, "name": name} for tag, name in LANGUAGES],
-            "models": list(list_model_names()),
+            "models": models,
             "devices": devices,
             "keys": [{"value": value, "label": label}
                      for value, label in SUGGESTED_TALK_KEYS],

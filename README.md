@@ -115,9 +115,9 @@ said.
 ## Things worth knowing
 
 **It needs an internet connection.** WinWhispr uses the speech recognition
-already built into Windows, which does the transcribing on Microsoft's
-servers. Your audio goes there and nowhere else. Your transcripts, settings and
-dictionary stay on your machine.
+already built into Windows rather than shipping its own model, and that service
+does the transcribing on its own servers. Your audio goes there and nowhere
+else. Your transcripts, settings and dictionary stay on your machine.
 
 **It only listens while you hold the key.** Nothing is recorded in the
 background, and the dot turns green whenever the microphone is open, so you can
@@ -134,17 +134,37 @@ Your settings live in `%USERPROFILE%\.cache\winwhispr`.
 
 ---
 
-## Installation
+## Installing
 
-No release is published yet — build from source for now.
+### The quick way
 
-**You need**
+1. Open the [latest release](https://github.com/Vatsa10/WindowWhispr/releases/latest).
+2. Download `WinWhispr-<version>-windows.zip`.
+3. Right-click the zip, choose **Extract All**, and pick somewhere permanent.
+   Your Downloads folder is not permanent.
+4. Open the extracted folder and run **WinWhispr.exe**.
 
-- [Python 3.10+](https://www.python.org/downloads/)
-- [`uv`](https://docs.astral.sh/uv/)
-- [Inno Setup 6](https://jrsoftware.org/isinfo.php), only to build the installer
+Windows will warn you that it does not recognise the app. It says this about
+every program without a paid code-signing certificate, which this does not yet
+have. Choose **More info**, then **Run anyway**. If you would rather not take
+that on trust, build it yourself from source below; it is the same program.
 
-**Set up and run**
+WinWhispr starts in the system tray with a small button near the corner of your
+screen. Tap it once to allow the microphone and you are done.
+
+### Keeping it
+
+Nothing is installed into Windows. The app is the folder you extracted, and
+deleting that folder removes it. To have it start with Windows, open the app
+and turn on **Start with Windows** in **Storage**.
+
+Your settings, dictionary and history live in `%USERPROFILE%\.cache\winwhispr`
+and survive an upgrade. To upgrade, download the new zip and replace the folder.
+
+WinWhispr checks for a newer release once a day and tells you in a notification
+when there is one. It never downloads or installs anything by itself.
+
+### Building it yourself
 
 ```powershell
 git clone https://github.com/Vatsa10/WindowWhispr.git
@@ -153,24 +173,25 @@ uv sync
 uv run winwhispr
 ```
 
-**Other ways to start it**
+You need [Python 3.10+](https://www.python.org/downloads/) and
+[`uv`](https://docs.astral.sh/uv/).
 
-```powershell
-uv run python main.py listen     # dictation only, no settings window
-uv run python main.py web        # dictate from a phone or another laptop
-```
-
-**Build a copy you can move to another machine**
+To produce the same portable folder the release contains:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File packaging\build.ps1
 ```
 
-Produces `dist\WinWhispr\WinWhispr.exe`, a portable folder you can zip and
-copy. Add `-Installer` to build `WinWhispr-Setup-<version>.exe` instead; the
-script finds `ISCC.exe` on its own.
+It lands in `dist\WinWhispr\`. Add `-Installer` to build a setup executable
+instead, which additionally needs
+[Inno Setup 6](https://jrsoftware.org/isinfo.php).
 
----
+### Other ways to start it
+
+```powershell
+uv run python main.py listen     # dictation only, no settings window
+uv run python main.py web        # dictate from a phone or another laptop
+```
 
 ## Dictate from your phone
 

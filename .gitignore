@@ -20,3 +20,4 @@ packaging/installer/Output/
 # Reference implementations we ported logic from; kept locally, not shipped.
 WhimprFlow/
 horseflow/
+WinWhispr-*-windows.zip
