@@ -225,8 +225,11 @@ if __name__ == "__main__":
     elif mode == "pill":
         # The recognizer window, started as a child of "listen". Not meant to
         # be run by hand, but harmless if it is.
-        from core.web.pill_host import run
+        from core.web.pill_host import DEFAULT_CORNER, run
 
-        run(sys.argv[2])
+        # The corner is the second argument and has to survive: dropping it
+        # pinned every frozen build to the bottom right whatever the user
+        # chose, because only the source build passes it through.
+        run(sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else DEFAULT_CORNER)
     else:
         main()
