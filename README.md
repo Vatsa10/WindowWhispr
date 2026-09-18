@@ -55,8 +55,10 @@ next best thing.
 **Dictate anywhere.** WinWhispr types into whatever window has focus, so it
 works in apps that have no dictation of their own.
 
-**Speak your punctuation.** Say "comma", "full stop", "question mark" or "new
-line" and you get the real thing.
+**Speak your punctuation.** Say "comma", "full stop", "question mark", "new
+line" or "new paragraph" and you get the real thing. Say "a comma splice" or
+"the period drama" and you keep the words, because they are the sentence
+rather than an instruction.
 
 **Cancel a sentence.** Press `Esc` while you are still holding the talk key and
 nothing is typed.

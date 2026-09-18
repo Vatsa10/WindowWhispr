@@ -46,6 +46,34 @@ def test_punctuation_words_used_as_nouns_survive():
     assert "comma" in apply_spoken_punctuation("a comma splice")
 
 
+def test_spoken_line_breaks_become_real_ones():
+    """The README promises this, so it has to be true."""
+    assert apply_spoken_punctuation("first line new line second line") == (
+        "first line\nsecond line")
+    assert apply_spoken_punctuation("one new paragraph two") == "one\n\ntwo"
+
+
+def test_a_line_break_survives_the_whole_pipeline():
+    """Spacing and capitalisation both run after it and both touch newlines."""
+    assert clean("thanks new line priya") == "Thanks\nPriya"
+
+
+def test_new_line_as_a_noun_survives():
+    """"a new line of code" is a thing people say."""
+    assert "new line" in clean("i wrote a new line of code")
+
+
+def test_a_word_ending_in_a_does_not_swallow_the_punctuation():
+    """The guard against "a comma" must not also match "Priya comma".
+
+    It did, for every name or noun ending in "a" -- anna, dana, data, idea,
+    area -- which silently turned dictated punctuation back into words.
+    """
+    assert clean("tell priya comma then go") == "Tell priya, then go"
+    assert clean("see anna full stop") == "See anna."
+    assert clean("the data period") == "The data."
+
+
 def test_capitalizes_sentences_and_the_pronoun_i():
     assert capitalize_sentences("i went. then i left.") == "I went. Then I left."
 

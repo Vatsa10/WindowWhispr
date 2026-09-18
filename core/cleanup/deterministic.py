@@ -28,6 +28,10 @@ LEADING_FILLERS = ("so", "well", "okay", "ok", "right", "now")
 #: Spoken punctuation. Order matters: longer phrases must be tried first, or
 #: "exclamation" would match inside "exclamation point".
 SPOKEN_PUNCTUATION = [
+    # Line breaks first: "new paragraph" contains no other phrase, but keeping
+    # the two together makes the pair obvious to the next reader.
+    ("new paragraph", "\n\n"),
+    ("new line", "\n"),
     ("exclamation point", "!"),
     ("exclamation mark", "!"),
     ("question mark", "?"),
@@ -43,6 +47,11 @@ SPOKEN_PUNCTUATION = [
 ]
 
 _WORD = r"(?<![\w'])%s(?![\w'])"
+
+#: Horizontal whitespace only. Plain ``\s`` includes newlines, and a rule that
+#: tidies spaces around punctuation must not quietly eat the line break the
+#: speaker asked for.
+_BLANK = r"[^\S\n]"
 
 
 def clean(text: str) -> str:
@@ -100,7 +109,18 @@ def apply_spoken_punctuation(text: str) -> str:
     """
     out = text
     for phrase, mark in SPOKEN_PUNCTUATION:
-        pattern = rf"(?<![\w'])(?<!the )(?<!a )(?<!an )(?<!this ){re.escape(phrase)}(?![\w'])"
+        # The \b in each lookbehind is load-bearing: without it "(?<!a )" also
+        # matches the last two characters of "priya ", so "tell Priya comma"
+        # kept the word "comma" -- as did every other name or noun ending in
+        # "a": anna, dana, data, idea, area.
+        pattern = (rf"(?<![\w'])(?<!\bthe )(?<!\ba )(?<!\ban )(?<!\bthis )"
+                   rf"{re.escape(phrase)}(?![\w'])")
+        if mark.startswith("\n"):
+            # A line break eats the spaces on both sides of the spoken words,
+            # or the next line starts with one.
+            out = re.sub(rf"{_BLANK}*{pattern}{_BLANK}*", mark, out,
+                         flags=re.IGNORECASE)
+            continue
         replacement = mark + " " if mark not in "([" else " " + mark
         out = re.sub(pattern, replacement, out, flags=re.IGNORECASE)
     # The spoken word had a space in front of it that the mark should not keep:
