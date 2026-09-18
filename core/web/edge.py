@@ -249,3 +249,23 @@ def grant_microphone(profile: str, origin: str) -> None:
         os.replace(temporary, path)
     except OSError:
         pass
+
+
+HWND_NOTOPMOST = wintypes.HWND(-2)
+
+
+def centre(hwnd: int, width: int, height: int,
+           screen: tuple[int, int], scale: float = 1.0) -> None:
+    """Put a normal window in the middle of the screen, at a usable size.
+
+    Edge remembers where each window of a profile last sat, which is how the
+    settings window came back at y=-2173 -- off the top of the screen, opened
+    but invisible. Placing it explicitly makes "open the app" mean the same
+    thing every time.
+    """
+    outer_w = round(width * scale)
+    outer_h = round(height * scale)
+    x = max(0, (screen[0] - outer_w) // 2)
+    y = max(0, (screen[1] - outer_h) // 2)
+    user32.SetWindowPos(hwnd, HWND_NOTOPMOST, x, y, outer_w, outer_h,
+                        SWP_SHOWWINDOW)

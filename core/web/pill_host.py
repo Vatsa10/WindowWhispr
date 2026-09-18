@@ -147,6 +147,11 @@ class Api:
             fresh = edge.browser_windows() - before
             if fresh:
                 self._app_window = next(iter(fresh))
+                # Placed rather than left where Edge last had it: it remembers
+                # per profile, and a window restored off the top of the screen
+                # is indistinguishable from one that never opened.
+                edge.centre(self._app_window, APP_WIDTH, APP_HEIGHT,
+                            self._screen, self._scale)
                 break
 
     def quit(self) -> None:
